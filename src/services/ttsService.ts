@@ -6,6 +6,8 @@ interface QueuedSpeech {
   // Karaoke key: the original transcription this utterance corresponds to, so
   // the UI can highlight the line currently being read aloud.
   id: string
+  // 0 (muted) to 1 (full).
+  volume: number
 }
 
 let speaking = false
@@ -54,17 +56,18 @@ function pickVoice(lang: string): SpeechSynthesisVoice | undefined {
 function playNext(): void {
   const next = queue.shift()
   if (next) {
-    speakNow(next.text, next.lang, next.id)
+    speakNow(next.text, next.lang, next.id, next.volume)
   } else {
     speakingListener(null)
   }
 }
 
-function speakNow(text: string, lang: string, id: string): void {
+function speakNow(text: string, lang: string, id: string, volume: number): void {
   speakingListener(id)
   const utterance = new SpeechSynthesisUtterance(text)
   const locale = LOCALE_MAP[lang] ?? lang
   utterance.lang = locale
+  utterance.volume = volume
   // Slightly above natural speed: while an utterance plays, new translations
   // queue behind it (and the oldest get dropped past the queue cap). Speaking
   // faster drains the queue sooner, losing fewer phrases and lagging less
@@ -100,19 +103,19 @@ function speakNow(text: string, lang: string, id: string): void {
   window.speechSynthesis.speak(utterance)
 }
 
-export function speak(text: string, lang: string = 'es', id: string = ''): void {
+export function speak(text: string, lang: string = 'es', id: string = '', volume: number = 1): void {
   const trimmed = text.trim()
   if (!trimmed || trimmed === lastSpoken) return
 
   if (speaking) {
-    queue.push({ text: trimmed, lang, id })
+    queue.push({ text: trimmed, lang, id, volume })
     // Falling behind — drop the oldest backlog so playback catches back up
     // with the live video instead of drifting further out of sync.
     while (queue.length > MAX_QUEUE_LENGTH) queue.shift()
     return
   }
 
-  speakNow(trimmed, lang, id)
+  speakNow(trimmed, lang, id, volume)
 }
 
 export function stopSpeech(): void {

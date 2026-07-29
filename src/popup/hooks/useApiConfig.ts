@@ -14,6 +14,9 @@ const DEFAULT_CONFIG: UserConfig = {
   uiLanguage: detectBrowserLocale(),
   uiTheme: detectPreferredTheme(),
   asrMode: 'auto',
+  voiceVolume: 1,
+  // Low by default: original audio is a quiet background under the translation.
+  originalVolume: 0.15,
 }
 
 interface UseUserConfigReturn {

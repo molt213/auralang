@@ -100,19 +100,20 @@ async function beginCaptureForTab(
   targetLanguage: string,
   sourceLanguage: string,
   asrMode: AsrMode,
+  originalVolume: number,
   isRetry = false,
 ): Promise<void> {
   try {
     const streamId = await requestMediaStreamId(tabId)
     capturedTabId = tabId
-    await startCapture({ streamId, targetLanguage, sourceLanguage, asrMode })
+    await startCapture({ streamId, targetLanguage, sourceLanguage, asrMode, originalVolume })
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
     // Stale session from a tab that closed without a clean STOP_CAPTURE — clear
     // our own state and retry once before giving up.
     if (!isRetry && msg.includes('active stream')) {
       await stopCapture()
-      await beginCaptureForTab(tabId, targetLanguage, sourceLanguage, asrMode, true)
+      await beginCaptureForTab(tabId, targetLanguage, sourceLanguage, asrMode, originalVolume, true)
       return
     }
     throw err
@@ -126,10 +127,12 @@ chrome.runtime.onMessage.addListener(
         targetLanguage?: string
         sourceLanguage?: string
         asrMode?: AsrMode
+        originalVolume?: number
       }
       const targetLanguage = payload?.targetLanguage ?? 'es'
       const sourceLanguage = payload?.sourceLanguage ?? 'en'
       const asrMode = payload?.asrMode ?? 'light'
+      const originalVolume = payload?.originalVolume ?? 0.15
 
       // targetTabId = tab to capture; omit consumerTabId so offscreen can redeem the streamId (Chrome 116+)
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -138,7 +141,7 @@ chrome.runtime.onMessage.addListener(
           sendResponse({ success: false, error: 'No active tab found' })
           return
         }
-        beginCaptureForTab(tabId, targetLanguage, sourceLanguage, asrMode)
+        beginCaptureForTab(tabId, targetLanguage, sourceLanguage, asrMode, originalVolume)
           .then(() => sendResponse({ success: true }))
           .catch((err: unknown) => {
             const msg = err instanceof Error ? err.message : 'Unknown error'

@@ -1,6 +1,6 @@
 import { transcribe } from './asrClient'
 import { translateText } from '../services/translationService'
-import { speak, stopSpeech } from '../services/ttsService'
+import { stopSpeech } from '../services/ttsService'
 import { isSilent } from '../utils/audioLevel'
 import { isSilenceHallucination, stripSeamRepeat } from '../utils/text'
 import type { TranscriptUpdatePayload } from '../types'
@@ -48,8 +48,7 @@ export async function processAudioChunk(
   if (sessionId !== mySession) return
   if (!translation) return
 
+  // The voice is spoken in the side panel (see useTranslation) from this same
+  // TRANSCRIPT_UPDATE — speechSynthesis is unreliable in the offscreen document.
   onTranscript({ original: transcription, translated: translation })
-  // Pass the original transcription as the karaoke id so the UI can highlight
-  // this line while it's being read aloud.
-  speak(translation, targetLang, transcription)
 }

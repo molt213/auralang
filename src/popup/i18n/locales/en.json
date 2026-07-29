@@ -19,6 +19,8 @@
   "settings.openAriaLabel": "Open settings",
   "settings.closeAriaLabel": "Close settings",
   "settings.backdropAriaLabel": "Close settings panel",
+  "originalVolume": "Original audio",
+  "voiceVolume": "Translation voice",
   "settings.uiLanguage": "Interface language",
   "settings.theme": "Theme",
   "settings.model": "Transcription model",
