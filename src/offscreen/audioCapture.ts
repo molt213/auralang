@@ -9,6 +9,11 @@ export interface AudioCaptureHandlers {
   onEnded: () => void
 }
 
+export interface AudioCaptureOptions {
+  // Original tab audio volume, 0 (muted) to 1 (full).
+  originalVolume: number
+}
+
 const WHISPER_SAMPLE_RATE = 16000
 
 // Cutting on a fixed clock (old: every 4s) slices sentences mid-word and feeds
@@ -33,12 +38,18 @@ const MAX_CHUNK_MS = 5000
 // translated and spoken. Require a minimum of real speech before emitting.
 const MIN_SPEECH_MS = 300
 
-const PAUSE_SAMPLES = WHISPER_SAMPLE_RATE * (PAUSE_MS / 1000)
-const MIN_CHUNK_SAMPLES = WHISPER_SAMPLE_RATE * (MIN_CHUNK_MS / 1000)
-const MAX_CHUNK_SAMPLES = WHISPER_SAMPLE_RATE * (MAX_CHUNK_MS / 1000)
-const MIN_SPEECH_SAMPLES = WHISPER_SAMPLE_RATE * (MIN_SPEECH_MS / 1000)
-
 const WORKLET_URL = chrome.runtime.getURL('capture-worklet.js')
+
+// The single AudioContext runs at the device's NATIVE rate. A second 16 kHz
+// context fed from the same MediaStream receives only silence in Chrome (streams
+// don't fan out across contexts with mismatched rates), so we capture and play
+// back at native rate and resample to 16 kHz for Whisper in flush(). The chunking
+// thresholds therefore depend on the actual capture rate, resolved at start.
+let captureRate = WHISPER_SAMPLE_RATE
+let pauseSamples = captureRate * (PAUSE_MS / 1000)
+let minChunkSamples = captureRate * (MIN_CHUNK_MS / 1000)
+let maxChunkSamples = captureRate * (MAX_CHUNK_MS / 1000)
+let minSpeechSamples = captureRate * (MIN_SPEECH_MS / 1000)
 
 let captureNode: AudioWorkletNode | null = null
 let audioContext: AudioContext | null = null
@@ -47,6 +58,23 @@ let pendingSamples: Float32Array[] = []
 let pendingLength = 0
 let silenceRunSamples = 0
 let speechSamples = 0
+
+// Linear-interpolation resample from the native capture rate down to Whisper's
+// 16 kHz. No anti-alias filter: speech energy sits well below 8 kHz and Whisper
+// is robust to the residual aliasing — not worth an offline rendering pass.
+function resampleToWhisperRate(input: Float32Array, fromRate: number): Float32Array {
+  if (fromRate === WHISPER_SAMPLE_RATE) return input
+  const ratio = fromRate / WHISPER_SAMPLE_RATE
+  const out = new Float32Array(Math.floor(input.length / ratio))
+  for (let i = 0; i < out.length; i++) {
+    const pos = i * ratio
+    const i0 = Math.floor(pos)
+    const i1 = Math.min(i0 + 1, input.length - 1)
+    const frac = pos - i0
+    out[i] = input[i0] * (1 - frac) + input[i1] * frac
+  }
+  return out
+}
 
 function flush(handlers: AudioCaptureHandlers): void {
   const chunk = new Float32Array(pendingLength)
@@ -58,12 +86,12 @@ function flush(handlers: AudioCaptureHandlers): void {
   pendingSamples = []
   pendingLength = 0
   silenceRunSamples = 0
-  const shouldEmit = speechSamples >= MIN_SPEECH_SAMPLES
+  const shouldEmit = speechSamples >= minSpeechSamples
   speechSamples = 0
 
   // Don't send near-silent buffers to Whisper — nothing to transcribe, and
   // near-empty audio is exactly what triggers hallucinated output ("you").
-  if (shouldEmit) handlers.onChunk(chunk)
+  if (shouldEmit) handlers.onChunk(resampleToWhisperRate(chunk, captureRate))
 }
 
 function pushSamples(samples: Float32Array, handlers: AudioCaptureHandlers): void {
@@ -77,8 +105,8 @@ function pushSamples(samples: Float32Array, handlers: AudioCaptureHandlers): voi
     speechSamples += samples.length
   }
 
-  const hitPause = silenceRunSamples >= PAUSE_SAMPLES && pendingLength >= MIN_CHUNK_SAMPLES
-  const hitMax = pendingLength >= MAX_CHUNK_SAMPLES
+  const hitPause = silenceRunSamples >= pauseSamples && pendingLength >= minChunkSamples
+  const hitMax = pendingLength >= maxChunkSamples
 
   if (hitPause || hitMax) flush(handlers)
 }
@@ -86,6 +114,7 @@ function pushSamples(samples: Float32Array, handlers: AudioCaptureHandlers): voi
 export async function startAudioCapture(
   streamId: string,
   handlers: AudioCaptureHandlers,
+  options: AudioCaptureOptions,
 ): Promise<void> {
   if (captureNode) return // already running
 
@@ -110,15 +139,27 @@ export async function startAudioCapture(
     handlers.onEnded()
   })
 
-  // Resample to 16 kHz mono — Whisper expects raw PCM Float32Array
-  audioContext = new AudioContext({ sampleRate: WHISPER_SAMPLE_RATE })
+  // Single context at the device's native rate: it demonstrably receives the tab
+  // audio (a 16 kHz context on the same stream gets silence). It both replays the
+  // original for the user and feeds the worklet; flush() resamples for Whisper.
+  audioContext = new AudioContext()
+  captureRate = audioContext.sampleRate
+  pauseSamples = captureRate * (PAUSE_MS / 1000)
+  minChunkSamples = captureRate * (MIN_CHUNK_MS / 1000)
+  maxChunkSamples = captureRate * (MAX_CHUNK_MS / 1000)
+  minSpeechSamples = captureRate * (MIN_SPEECH_MS / 1000)
+
   const source = audioContext.createMediaStreamSource(stream)
 
-  const gain = audioContext.createGain()
-  gain.gain.value = 0 // silence original tab audio
-  source.connect(gain)
-  gain.connect(audioContext.destination)
+  // Playback path: a tab under capture is muted by Chrome, so replay the original
+  // for the user at a low background level (0 = muted).
+  const playbackGain = audioContext.createGain()
+  playbackGain.gain.value = options.originalVolume
+  source.connect(playbackGain)
+  playbackGain.connect(audioContext.destination)
 
+  // Analysis path: the worklet mixes to mono and posts raw samples back — it
+  // produces no audible output, so connecting it to destination adds no echo.
   await audioContext.audioWorklet.addModule(WORKLET_URL)
 
   captureNode = new AudioWorkletNode(audioContext, 'capture-processor')
@@ -128,6 +169,12 @@ export async function startAudioCapture(
 
   source.connect(captureNode)
   captureNode.connect(audioContext.destination)
+
+  // The offscreen document never gets a user gesture, so the autoplay policy can
+  // leave the context "suspended" — which silently stops both the worklet (no
+  // transcription) and the playback (no sound). Resume explicitly; ignore a
+  // rejection so a blocked resume never aborts the capture.
+  await audioContext.resume().catch(() => {})
 }
 
 export function stopAudioCapture(): void {

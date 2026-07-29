@@ -14,6 +14,7 @@ import { LanguageSelect } from './components/LanguageSelect'
 import { PrimaryButton } from './components/PrimaryButton'
 import { Footer } from './components/Footer'
 import { SettingsPanel } from './components/SettingsPanel'
+import { VolumeSlider } from './components/VolumeSlider'
 import { TranscriptFeed } from './components/TranscriptFeed'
 import { PlayIcon, StopIcon } from './components/Icons'
 import type { UiLanguage, UiTheme } from '../types'
@@ -208,6 +209,12 @@ export default function App() {
                 ? t('stop')
                 : t('startTranslation')}
           </PrimaryButton>
+
+          <VolumeSlider
+            label={t('voiceVolume')}
+            value={config.voiceVolume}
+            onChange={(value) => updateField('voiceVolume', value)}
+          />
         </div>
 
         <Footer label={t('tabAudioOnly')} />

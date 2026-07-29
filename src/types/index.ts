@@ -9,6 +9,10 @@ export interface UserConfig {
   uiLanguage: UiLanguage
   uiTheme: UiTheme
   asrMode: AsrMode
+  // Translation voice volume, 0 (muted) to 1 (full).
+  voiceVolume: number
+  // Original tab audio volume, 0 (muted) to 1 (full).
+  originalVolume: number
 }
 
 export interface TranslationState {
@@ -29,7 +33,6 @@ export type MessageType =
   | 'END_STREAM'          // background → offscreen
   | 'MODEL_READY'
   | 'MODEL_STATUS'        // offscreen → popup (download progress, probe, ready, error)
-  | 'SPEAKING'            // offscreen → popup (karaoke: which line is being read aloud)
   | 'GET_CAPTURE_STATE'
   | 'CAPTURE_ENDED'       // offscreen → background/popup (source tab closed or stream lost)
   | 'TRANSCRIPT_UPDATE'   // offscreen → popup (live transcription/translation text)
@@ -45,6 +48,7 @@ export interface StartCapturePayload {
   targetLanguage: string
   sourceLanguage: string
   asrMode: AsrMode
+  originalVolume: number
 }
 
 export interface TranslationResultPayload {

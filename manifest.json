@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AuraLang",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Traduce el audio de cualquier pestaña en tiempo real. Transcripción local con Whisper, sin API key ni cuenta.",
   "permissions": [
     "tabCapture",
