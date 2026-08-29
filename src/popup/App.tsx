@@ -137,6 +137,8 @@ export default function App() {
                   <TranscriptFeed
                     transcripts={translation.transcripts}
                     translatingLabel={t('translating')}
+                    translationFailedLabel={t('translationFailed')}
+                    translationSkippedLabel={t('translationSkipped')}
                     speakingOriginal={translation.speakingOriginal}
                   />
                 )}
@@ -159,6 +161,8 @@ export default function App() {
                   <TranscriptFeed
                     transcripts={translation.transcripts}
                     translatingLabel={t('translating')}
+                    translationFailedLabel={t('translationFailed')}
+                    translationSkippedLabel={t('translationSkipped')}
                     speakingOriginal={translation.speakingOriginal}
                   />
                 ) : (

@@ -1,5 +1,5 @@
 import { transcribe } from './asrClient'
-import { LatestTranslationQueue } from './latestTranslationQueue'
+import { PrioritizedTranslationQueue } from './latestTranslationQueue'
 import { translateText } from '../services/translationService'
 import { stopSpeech } from '../services/ttsService'
 import { isSilent } from '../utils/audioLevel'
@@ -9,7 +9,7 @@ import type { TranscriptUpdatePayload, TranslationConfig } from '../types'
 let lastTranscription = ''
 let sessionId = 0
 let nextSegmentId = 0
-const translationQueue = new LatestTranslationQueue()
+const translationQueue = new PrioritizedTranslationQueue()
 
 function translationErrorCode(error: unknown): string {
   if (!(error instanceof Error)) return 'translationFailed'
@@ -25,10 +25,24 @@ function translationErrorCode(error: unknown): string {
   return 'translationFailed'
 }
 
+export function createTranslationResultUpdate(
+  segmentId: number,
+  original: string,
+  translation: string | null,
+): TranscriptUpdatePayload {
+  const translated = translation?.trim() ?? ''
+  return {
+    segmentId,
+    original,
+    translated: translated || null,
+    translationStatus: translated ? 'translated' : 'failed',
+  }
+}
+
 export function resetPipelineState(): void {
   lastTranscription = ''
-  sessionId += 1
   translationQueue.clear()
+  sessionId += 1
   stopSpeech()
 }
 
@@ -59,7 +73,12 @@ export async function processAudioChunk(
 
   lastTranscription = transcription
   const segmentId = ++nextSegmentId
-  onTranscript({ segmentId, original: transcription, translated: null })
+  onTranscript({
+    segmentId,
+    original: transcription,
+    translated: null,
+    translationStatus: 'pending',
+  })
 
   translationQueue.enqueue(async (signal) => {
     try {
@@ -70,14 +89,27 @@ export async function processAudioChunk(
         translationConfig,
         signal,
       )
-      if (signal.aborted || sessionId !== chunkSessionId || !translation) return
+      if (signal.aborted || sessionId !== chunkSessionId) return
+      const result = createTranslationResultUpdate(segmentId, transcription, translation)
+      onTranscript(result)
+      if (result.translationStatus !== 'translated') {
+        return
+      }
 
       // The voice is spoken in the side panel (see useTranslation) from this same
       // TRANSCRIPT_UPDATE — speechSynthesis is unreliable in the offscreen document.
-      onTranscript({ segmentId, original: transcription, translated: translation })
     } catch (error) {
       if (signal.aborted || sessionId !== chunkSessionId) return
+      onTranscript(createTranslationResultUpdate(segmentId, transcription, null))
       onTranslationError(translationErrorCode(error))
     }
+  }, () => {
+    if (sessionId !== chunkSessionId) return
+    onTranscript({
+      segmentId,
+      original: transcription,
+      translated: null,
+      translationStatus: 'skipped',
+    })
   })
 }

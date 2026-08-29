@@ -12,6 +12,8 @@
   "listening": "Escuchando…",
   "capturingAudio": "Capturando audio de esta pestaña",
   "translating": "Traduciendo…",
+  "translationFailed": "Traducción no disponible",
+  "translationSkipped": "Traducción detenida",
   "connecting": "Conectando…",
   "connectingDescription": "Configurando captura de audio",
   "tabAudioOnly": "Solo audio de esta pestaña",

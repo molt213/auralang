@@ -207,10 +207,22 @@ export function installVideoSubtitleOverlay(): void {
       return
     }
 
+    const translationStatus = 'translationStatus' in payload && typeof payload.translationStatus === 'string'
+      ? payload.translationStatus
+      : undefined
     const translated = payload.translated?.trim() ?? ''
     const original = payload.original.trim()
     if (payload.segmentId < displayedSegmentId) return
     if (payload.segmentId === displayedSegmentId && !translated && displayedTranslation) return
+
+    // A terminal failure or a stopped request must not make the original
+    // transcript look like a completed translation on the video.
+    if (translationStatus === 'failed' || translationStatus === 'skipped') {
+      displayedSegmentId = payload.segmentId
+      displayedTranslation = false
+      hideSubtitles()
+      return
+    }
 
     displayedSegmentId = payload.segmentId
     displayedTranslation = Boolean(translated)

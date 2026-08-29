@@ -12,6 +12,8 @@
   "listening": "正在聆听…",
   "capturingAudio": "正在捕获此标签页的音频",
   "translating": "正在翻译…",
+  "translationFailed": "暂无译文",
+  "translationSkipped": "翻译已停止",
   "connecting": "正在连接…",
   "connectingDescription": "正在设置音频捕获",
   "tabAudioOnly": "仅捕获当前标签页的音频",

@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 
 import type { ExtensionMessage, TranscriptUpdatePayload } from '../types'
-import { CAPTURED_TAB_ID_KEY, CAPTURE_STATE_KEY } from './captureSessionService'
+import {
+  CAPTURED_TAB_ID_KEY,
+  CAPTURE_STATE_KEY,
+  LATEST_SEGMENT_ID_KEY,
+} from './captureSessionService'
 
 type MessageListener = (
   message: ExtensionMessage,
@@ -85,10 +89,24 @@ describe('Given a restarted service worker with an active capture session', () =
     )
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
 
-    expect(sessionGet).toHaveBeenCalledWith([CAPTURE_STATE_KEY, CAPTURED_TAB_ID_KEY])
+    expect(sessionGet).toHaveBeenCalledWith([
+      CAPTURE_STATE_KEY,
+      CAPTURED_TAB_ID_KEY,
+      LATEST_SEGMENT_ID_KEY,
+    ])
     expect(tabSendMessage).toHaveBeenCalledWith(42, {
       type: 'VIDEO_SUBTITLE_UPDATE',
       payload: transcript,
     })
+
+    let captureState: unknown
+    messageListener(
+      { type: 'GET_CAPTURE_STATE' },
+      {} as chrome.runtime.MessageSender,
+      (response) => { captureState = response },
+    )
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+    expect(captureState).toEqual({ active: true, latestSegmentId: 1 })
   })
 })

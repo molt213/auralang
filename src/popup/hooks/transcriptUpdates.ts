@@ -1,6 +1,22 @@
-import type { TranscriptUpdatePayload } from '../../types'
+import type { TranscriptTranslationStatus, TranscriptUpdatePayload } from '../../types'
+import { MAX_TRANSCRIPT_ENTRIES } from '../../constants/transcript'
 
-const MAX_TRANSCRIPTS = 50
+function statusOf(update: TranscriptUpdatePayload): TranscriptTranslationStatus {
+  if (update.translationStatus) return update.translationStatus
+  return update.translated === null ? 'pending' : 'translated'
+}
+
+export function shouldSpeakTranslation(
+  update: TranscriptUpdatePayload,
+  latestSegmentId: number,
+  isCurrentCaptureKnown: boolean,
+): update is TranscriptUpdatePayload & { translated: string } {
+  return isCurrentCaptureKnown
+    && typeof update.translated === 'string'
+    && Boolean(update.translated.trim())
+    && statusOf(update) === 'translated'
+    && update.segmentId === latestSegmentId
+}
 
 export function upsertTranscriptUpdate(
   transcripts: TranscriptUpdatePayload[],
@@ -8,11 +24,20 @@ export function upsertTranscriptUpdate(
 ): TranscriptUpdatePayload[] {
   const matchingIndex = transcripts.findIndex((entry) => entry.segmentId === update.segmentId)
   if (matchingIndex === -1) {
-    return [...transcripts, update].slice(-MAX_TRANSCRIPTS)
+    return [...transcripts, update]
+      .sort((first, second) => first.segmentId - second.segmentId)
+      .slice(-MAX_TRANSCRIPT_ENTRIES)
   }
 
   const current = transcripts[matchingIndex]
-  if (current?.translated !== null && update.translated === null) {
+  if (!current) return transcripts
+
+  const currentStatus = statusOf(current)
+  const incomingStatus = statusOf(update)
+  if (
+    (currentStatus === 'translated' && incomingStatus !== 'translated')
+    || (currentStatus !== 'pending' && incomingStatus === 'pending')
+  ) {
     return transcripts
   }
 

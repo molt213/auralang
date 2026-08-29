@@ -46,10 +46,19 @@ export interface StartCapturePayload {
 
 export type StartCaptureRequest = Omit<StartCapturePayload, 'streamId'>
 
+export type TranscriptTranslationStatus = 'pending' | 'translated' | 'failed' | 'skipped'
+
 export interface TranscriptUpdatePayload {
   segmentId: number
   original: string
   translated: string | null
+  // Optional for compatibility with messages from an older offscreen document.
+  translationStatus?: TranscriptTranslationStatus
+}
+
+export interface CaptureStateResponse {
+  active: boolean
+  latestSegmentId: number
 }
 
 export interface ErrorPayload {

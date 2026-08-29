@@ -4,6 +4,8 @@ import type { TranscriptUpdatePayload } from '../../types'
 interface TranscriptFeedProps {
   transcripts: TranscriptUpdatePayload[]
   translatingLabel: string
+  translationFailedLabel: string
+  translationSkippedLabel: string
   // Karaoke: original transcription of the line currently being read aloud.
   speakingOriginal: string | null
 }
@@ -11,6 +13,8 @@ interface TranscriptFeedProps {
 export function TranscriptFeed({
   transcripts,
   translatingLabel,
+  translationFailedLabel,
+  translationSkippedLabel,
   speakingOriginal,
 }: TranscriptFeedProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -48,6 +52,8 @@ export function TranscriptFeed({
       ) : (
         transcripts.map((entry, i) => {
           const isSpeaking = speakingOriginal !== null && entry.original === speakingOriginal
+          const status = entry.translationStatus
+            ?? (entry.translated === null ? 'pending' : 'translated')
           return (
             <div
               key={entry.segmentId}
@@ -57,13 +63,21 @@ export function TranscriptFeed({
               }`}
             >
               <p className="text-caption leading-snug text-muted">{entry.original}</p>
-              {entry.translated === null && i === transcripts.length - 1 ? (
-                // Only the latest line remains eligible for translation in the
-                // live queue; older lines stay readable without a stale spinner.
+              {status === 'pending' ? (
+                // Every queued line stays eligible for translation, so each
+                // one needs an explicit loading state while it is backfilled.
                 <p className="animate-pulse text-body italic leading-snug text-muted">
                   {translatingLabel}
                 </p>
-              ) : entry.translated !== null ? (
+              ) : status === 'failed' ? (
+                <p className="text-body italic leading-snug text-muted">
+                  {translationFailedLabel}
+                </p>
+              ) : status === 'skipped' ? (
+                <p className="text-body italic leading-snug text-muted">
+                  {translationSkippedLabel}
+                </p>
+              ) : (
                 <p
                   className={`animate-fade-in text-body leading-snug ${
                     isSpeaking ? 'font-semibold text-brand-purple' : 'text-[var(--text-primary)]'
@@ -71,7 +85,7 @@ export function TranscriptFeed({
                 >
                   {entry.translated}
                 </p>
-              ) : null}
+              )}
             </div>
           )
         })

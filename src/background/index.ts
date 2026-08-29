@@ -1,5 +1,10 @@
 import type { AsrMode } from '../asr/types'
-import type { ExtensionMessage, StartCapturePayload, TranslationConfig } from '../types'
+import type {
+  CaptureStateResponse,
+  ExtensionMessage,
+  StartCapturePayload,
+  TranslationConfig,
+} from '../types'
 import {
   clearCaptureSession,
   loadCaptureSession,
@@ -15,6 +20,7 @@ const OFFSCREEN_URL = chrome.runtime.getURL('src/offscreen/index.html')
 
 let captureActive = false
 let capturedTabId: number | null = null
+let latestTranscriptSegmentId = 0
 
 const PANEL_PATH = 'src/popup/index.html'
 
@@ -42,8 +48,9 @@ chrome.runtime.onStartup.addListener(() => void ensureOffscreenDocument())
 
 async function setCaptureActive(active: boolean): Promise<void> {
   captureActive = active
+  latestTranscriptSegmentId = 0
   if (active && capturedTabId !== null) {
-    await saveCaptureSession(capturedTabId)
+    await saveCaptureSession(capturedTabId, latestTranscriptSegmentId)
     return
   }
   await clearCaptureSession()
@@ -54,6 +61,7 @@ async function getCaptureActive(): Promise<boolean> {
   const session = await loadCaptureSession()
   captureActive = session.active
   capturedTabId = session.tabId
+  latestTranscriptSegmentId = session.latestSegmentId
   return captureActive
 }
 
@@ -62,6 +70,7 @@ async function getCapturedTabId(): Promise<number | null> {
   const session = await loadCaptureSession()
   captureActive = session.active
   capturedTabId = session.tabId
+  latestTranscriptSegmentId = session.latestSegmentId
   return capturedTabId
 }
 
@@ -188,13 +197,25 @@ chrome.runtime.onMessage.addListener(
 
     if (message.type === 'TRANSCRIPT_UPDATE') {
       void getCapturedTabId().then((tabId) => {
-        if (captureActive && tabId !== null) return updateVideoSubtitles(tabId, message.payload)
+        if (!captureActive || tabId === null) return
+
+        if (message.payload.segmentId > latestTranscriptSegmentId) {
+          latestTranscriptSegmentId = message.payload.segmentId
+          void saveCaptureSession(tabId, latestTranscriptSegmentId).catch(() => undefined)
+        }
+        return updateVideoSubtitles(tabId, message.payload)
       })
       return false
     }
 
     if (message.type === 'GET_CAPTURE_STATE') {
-      void getCaptureActive().then((active) => sendResponse({ active }))
+      void getCaptureActive().then((active) => {
+        const response: CaptureStateResponse = {
+          active,
+          latestSegmentId: active ? latestTranscriptSegmentId : 0,
+        }
+        sendResponse(response)
+      })
       return true
     }
   },

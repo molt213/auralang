@@ -1,8 +1,13 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import type { TranslationState, ExtensionMessage, UserConfig } from '../../types'
+import type {
+  CaptureStateResponse,
+  ExtensionMessage,
+  TranslationState,
+  UserConfig,
+} from '../../types'
 import { speak, stopSpeech, onSpeakingChange } from '../../services/ttsService'
 import { externalApiPermissionOrigin } from '../../services/translationService'
-import { upsertTranscriptUpdate } from './transcriptUpdates'
+import { shouldSpeakTranslation, upsertTranscriptUpdate } from './transcriptUpdates'
 
 export interface UseTranslationReturn {
   state: TranslationState
@@ -27,6 +32,9 @@ export function useTranslation(
   // was unreliable/silent. The panel is a focused document with real audio.
   const targetLangRef = useRef(config.targetLanguage)
   const voiceVolumeRef = useRef(config.voiceVolume)
+  const latestSegmentIdRef = useRef(0)
+  const currentCaptureKnownRef = useRef(false)
+  const captureStateVersionRef = useRef(0)
 
   useEffect(() => {
     targetLangRef.current = config.targetLanguage
@@ -42,10 +50,18 @@ export function useTranslation(
   }, [config.voiceVolume])
 
   useEffect(() => {
+    const requestedCaptureStateVersion = captureStateVersionRef.current
     chrome.runtime.sendMessage<ExtensionMessage>(
       { type: 'GET_CAPTURE_STATE' },
-      (response: { active?: boolean } | undefined) => {
-        if (chrome.runtime.lastError) return
+      (response: CaptureStateResponse | undefined) => {
+        if (
+          chrome.runtime.lastError
+          || captureStateVersionRef.current !== requestedCaptureStateVersion
+        ) {
+          return
+        }
+        latestSegmentIdRef.current = Math.max(latestSegmentIdRef.current, response?.latestSegmentId ?? 0)
+        currentCaptureKnownRef.current = response?.active === true
         if (response?.active) {
           setState((prev) => ({ ...prev, isActive: true }))
         }
@@ -82,6 +98,8 @@ export function useTranslation(
       }
       if (message.type === 'CAPTURE_ENDED') {
         stopSpeech()
+        captureStateVersionRef.current += 1
+        currentCaptureKnownRef.current = false
         setState((prev) => ({
           ...prev,
           isActive: false,
@@ -91,10 +109,19 @@ export function useTranslation(
       }
       if (message.type === 'TRANSCRIPT_UPDATE') {
         const payload = message.payload
+        latestSegmentIdRef.current = Math.max(latestSegmentIdRef.current, payload.segmentId)
         // Speak the translation here in the panel (reliable audio). The chunk
         // arrives twice; the first emit has translated === null, so this only
-        // fires once the translation is in. Volume 0 = muted, so skip speaking.
-        if (payload.translated && voiceVolumeRef.current > 0) {
+        // fires once the translation is in. Backfilled older lines stay silent
+        // so concurrent requests cannot make speech play out of order.
+        if (
+          shouldSpeakTranslation(
+            payload,
+            latestSegmentIdRef.current,
+            currentCaptureKnownRef.current,
+          )
+          && voiceVolumeRef.current > 0
+        ) {
           speak(payload.translated, targetLangRef.current, payload.original, voiceVolumeRef.current)
         }
         setState((prev) => {
@@ -131,6 +158,13 @@ export function useTranslation(
       }
     }
 
+    captureStateVersionRef.current += 1
+    if (starting) {
+      latestSegmentIdRef.current = 0
+      currentCaptureKnownRef.current = false
+    } else {
+      currentCaptureKnownRef.current = false
+    }
     stopSpeech() // cut any queued/current utterance on both start and stop
     // Clear the transcript only when starting a new session — keep it visible
     // after Stop so the user can still read what was said.
@@ -158,6 +192,7 @@ export function useTranslation(
       message,
       (response: { success: boolean; error?: string }) => {
         if (chrome.runtime.lastError || !response?.success) {
+          if (starting) currentCaptureKnownRef.current = false
           setState((prev) => ({
             ...prev,
             isLoading: false,
@@ -165,6 +200,7 @@ export function useTranslation(
           }))
           return
         }
+        if (starting) currentCaptureKnownRef.current = true
         setState((prev) => ({
           ...prev,
           isActive: !prev.isActive,

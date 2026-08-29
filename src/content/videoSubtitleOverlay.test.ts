@@ -159,4 +159,30 @@ describe('Given a page with a playing video', () => {
     const overlay = document.getElementById(VIDEO_SUBTITLE_OVERLAY_ID)
     expect(overlay?.textContent).toContain('第一句')
   })
+
+  it('When a translation fails, Then it hides the overlay instead of presenting the original as a translation', () => {
+    createVideo()
+    installVideoSubtitleOverlay()
+    sendToSubtitleOverlay({
+      type: 'VIDEO_SUBTITLE_UPDATE',
+      payload: { segmentId: 1, original: 'Failed sentence', translated: null, translationStatus: 'failed' },
+    })
+
+    const overlay = document.getElementById(VIDEO_SUBTITLE_OVERLAY_ID)
+    expect(overlay?.hidden).toBe(true)
+    expect(overlay?.textContent).toBe('')
+  })
+
+  it('When translation stops for the current segment, Then it hides the overlay without showing the original as completed output', () => {
+    createVideo()
+    installVideoSubtitleOverlay()
+    sendToSubtitleOverlay({
+      type: 'VIDEO_SUBTITLE_UPDATE',
+      payload: { segmentId: 1, original: 'Stopped sentence', translated: null, translationStatus: 'skipped' },
+    })
+
+    const overlay = document.getElementById(VIDEO_SUBTITLE_OVERLAY_ID)
+    expect(overlay?.hidden).toBe(true)
+    expect(overlay?.textContent).toBe('')
+  })
 })

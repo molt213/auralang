@@ -1,40 +1,93 @@
+import { MAX_TRANSCRIPT_ENTRIES } from '../constants/transcript'
+
 export type TranslationTask = (signal: AbortSignal) => Promise<void>
+export type TranslationDiscardHandler = () => void
+
+interface PendingTranslation {
+  task: TranslationTask
+  onDiscard?: TranslationDiscardHandler
+}
 
 interface ActiveTranslation {
   controller: AbortController
+  onDiscard?: TranslationDiscardHandler
+  discarded: boolean
 }
 
-// Live captions favor the newest spoken line. A stale network request is
-// cancelled when newer speech arrives, while ASR continues on its own queue.
-export class LatestTranslationQueue {
-  private active: ActiveTranslation | null = null
-  private pending: TranslationTask | null = null
+const DEFAULT_MAX_CONCURRENT_TRANSLATIONS = 3
+const NEWEST_TASKS_BEFORE_BACKFILL = 2
 
-  enqueue(task: TranslationTask): void {
-    this.pending = task
-    this.active?.controller.abort()
-    this.startNext()
+// New captions start before older queued work, while the visible transcript
+// window remains bounded so a slow provider cannot grow memory forever.
+export class PrioritizedTranslationQueue {
+  private readonly maxConcurrent: number
+  private active = new Set<ActiveTranslation>()
+  private pending: PendingTranslation[] = []
+  private newestTasksSinceBackfill = 0
+
+  constructor(maxConcurrent: number = DEFAULT_MAX_CONCURRENT_TRANSLATIONS) {
+    this.maxConcurrent = maxConcurrent
+  }
+
+  enqueue(task: TranslationTask, onDiscard?: TranslationDiscardHandler): void {
+    this.pending.push({ task, onDiscard })
+    if (this.pending.length > MAX_TRANSCRIPT_ENTRIES) {
+      this.pending.shift()?.onDiscard?.()
+    }
+    this.startAvailableTasks()
   }
 
   clear(): void {
-    this.pending = null
-    this.active?.controller.abort()
+    const pending = this.pending
+    this.pending = []
+    this.newestTasksSinceBackfill = 0
+    for (const item of pending) item.onDiscard?.()
+    for (const active of this.active) {
+      active.controller.abort()
+      if (!active.discarded) {
+        active.discarded = true
+        active.onDiscard?.()
+      }
+    }
   }
 
-  private startNext(): void {
-    if (this.active || !this.pending) return
+  private startAvailableTasks(): void {
+    while (this.active.size < this.maxConcurrent) {
+      const pending = this.takeNextTask()
+      if (!pending) return
 
-    const task = this.pending
-    this.pending = null
-    const active: ActiveTranslation = { controller: new AbortController() }
-    this.active = active
+      const active: ActiveTranslation = {
+        controller: new AbortController(),
+        onDiscard: pending.onDiscard,
+        discarded: false,
+      }
+      this.active.add(active)
+      void pending.task(active.controller.signal)
+        .catch(() => undefined)
+        .finally(() => {
+          this.active.delete(active)
+          this.startAvailableTasks()
+        })
+    }
+  }
 
-    void task(active.controller.signal)
-      .catch(() => undefined)
-      .finally(() => {
-        if (this.active !== active) return
-        this.active = null
-        this.startNext()
-      })
+  private takeNextTask(): PendingTranslation | undefined {
+    if (this.pending.length === 0) {
+      this.newestTasksSinceBackfill = 0
+      return undefined
+    }
+
+    if (this.pending.length === 1) {
+      this.newestTasksSinceBackfill = 0
+      return this.pending.shift()
+    }
+
+    if (this.newestTasksSinceBackfill < NEWEST_TASKS_BEFORE_BACKFILL) {
+      this.newestTasksSinceBackfill += 1
+      return this.pending.pop()
+    }
+
+    this.newestTasksSinceBackfill = 0
+    return this.pending.shift()
   }
 }
