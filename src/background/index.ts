@@ -1,8 +1,17 @@
 import type { AsrMode } from '../asr/types'
 import type { ExtensionMessage, StartCapturePayload, TranslationConfig } from '../types'
+import {
+  clearCaptureSession,
+  loadCaptureSession,
+  saveCaptureSession,
+} from './captureSessionService'
+import {
+  disposeVideoSubtitleOverlay,
+  ensureVideoSubtitleOverlay,
+  updateVideoSubtitles,
+} from './videoSubtitleService'
 
 const OFFSCREEN_URL = chrome.runtime.getURL('src/offscreen/index.html')
-const CAPTURE_STATE_KEY = 'auralang_capture_active'
 
 let captureActive = false
 let capturedTabId: number | null = null
@@ -33,14 +42,27 @@ chrome.runtime.onStartup.addListener(() => void ensureOffscreenDocument())
 
 async function setCaptureActive(active: boolean): Promise<void> {
   captureActive = active
-  await chrome.storage.session.set({ [CAPTURE_STATE_KEY]: active })
+  if (active && capturedTabId !== null) {
+    await saveCaptureSession(capturedTabId)
+    return
+  }
+  await clearCaptureSession()
 }
 
 async function getCaptureActive(): Promise<boolean> {
   if (captureActive) return true
-  const stored = await chrome.storage.session.get(CAPTURE_STATE_KEY)
-  captureActive = stored[CAPTURE_STATE_KEY] === true
+  const session = await loadCaptureSession()
+  captureActive = session.active
+  capturedTabId = session.tabId
   return captureActive
+}
+
+async function getCapturedTabId(): Promise<number | null> {
+  if (capturedTabId !== null) return capturedTabId
+  const session = await loadCaptureSession()
+  captureActive = session.active
+  capturedTabId = session.tabId
+  return capturedTabId
 }
 
 async function ensureOffscreenDocument(): Promise<void> {
@@ -66,6 +88,9 @@ async function startCapture(payload: StartCapturePayload): Promise<void> {
 }
 
 async function stopCapture(): Promise<void> {
+  const tabId = await getCapturedTabId()
+  if (tabId !== null) void disposeVideoSubtitleOverlay(tabId)
+
   const contexts = await chrome.runtime.getContexts({
     contextTypes: [chrome.runtime.ContextType.OFFSCREEN_DOCUMENT],
   })
@@ -80,7 +105,9 @@ async function stopCapture(): Promise<void> {
 // Backup for the offscreen "stream ended" signal: if the captured tab is closed
 // outright, make sure our own state doesn't stay stuck on "active".
 chrome.tabs.onRemoved.addListener((tabId) => {
-  if (tabId === capturedTabId) void stopCapture()
+  void getCapturedTabId().then((capturedId) => {
+    if (tabId === capturedId) return stopCapture()
+  })
 })
 
 function requestMediaStreamId(tabId: number): Promise<string> {
@@ -107,6 +134,7 @@ async function beginCaptureForTab(
   try {
     const streamId = await requestMediaStreamId(tabId)
     capturedTabId = tabId
+    await ensureVideoSubtitleOverlay(tabId)
     await startCapture({ streamId, targetLanguage, sourceLanguage, asrMode, originalVolume, translation })
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'unknownError'
@@ -155,6 +183,13 @@ chrome.runtime.onMessage.addListener(
 
     if (message.type === 'CAPTURE_ENDED') {
       void stopCapture()
+      return false
+    }
+
+    if (message.type === 'TRANSCRIPT_UPDATE') {
+      void getCapturedTabId().then((tabId) => {
+        if (captureActive && tabId !== null) return updateVideoSubtitles(tabId, message.payload)
+      })
       return false
     }
 

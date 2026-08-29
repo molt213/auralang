@@ -39,6 +39,7 @@ Watching a talk, a podcast, or a video in a language you don't speak? AuraLang l
 - 🧠 **On-device transcription** — Whisper runs locally; audio never leaves your machine.
 - 🗣️ **Spoken translation** — the original tab audio is muted; you only hear the translation.
 - 📊 **Live transcript with karaoke** — read the original + translation in a side panel; the line being spoken is highlighted.
+- 🎬 **On-video subtitles** — the latest original and translation appear at the bottom of the active video.
 - 🎚️ **Model modes** — Auto / Light (whisper-tiny) / Balanced (whisper-base): trade speed for accuracy per your device.
 - 🔒 **Free by default** — Google Translate needs no key; an external OpenAI-compatible API is optional.
 - 🌗 **Light & dark themes**, interface in **English, Spanish, and Simplified Chinese**.
@@ -100,7 +101,7 @@ npm run zip         # Build + package dist.zip for the Web Store
 
 | Layer | Tool |
 |---|---|
-| Extension API | Chrome MV3 — `tabCapture`, `offscreen`, `sidePanel`, `storage` |
+| Extension API | Chrome MV3 — `tabCapture`, `offscreen`, `scripting`, `sidePanel`, `storage` |
 | Build | Vite + `@crxjs/vite-plugin` |
 | UI | React 18 + TypeScript (strict) |
 | Styles | Tailwind CSS |

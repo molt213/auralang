@@ -55,6 +55,17 @@ export interface ErrorPayload {
   message: string
 }
 
+export type VideoSubtitleUpdateMessage = {
+  type: 'VIDEO_SUBTITLE_UPDATE'
+  payload: TranscriptUpdatePayload
+}
+
+export type DisposeVideoSubtitleOverlayMessage = {
+  type: 'DISPOSE_VIDEO_SUBTITLE_OVERLAY'
+}
+
+export type VideoSubtitleMessage = VideoSubtitleUpdateMessage | DisposeVideoSubtitleOverlayMessage
+
 export type ExtensionMessage =
   | { type: 'START_CAPTURE'; payload: StartCaptureRequest }
   | { type: 'STOP_CAPTURE' }
@@ -65,4 +76,5 @@ export type ExtensionMessage =
   | { type: 'GET_CAPTURE_STATE' }
   | { type: 'CAPTURE_ENDED' }
   | { type: 'TRANSCRIPT_UPDATE'; payload: TranscriptUpdatePayload }
+  | VideoSubtitleMessage
   | { type: 'ERROR'; payload: ErrorPayload }
