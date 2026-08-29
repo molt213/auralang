@@ -12,6 +12,7 @@ function friendlyMessage(error: string, t: (key: MessageKey) => string): string 
   if (error === 'captureEnded') return t('captureEnded')
   const translatedErrors: Partial<Record<string, MessageKey>> = {
     unknownError: 'error.unknown',
+    translationFailed: 'error.translationFailed',
     externalApiMissingBaseUrl: 'externalApi.errorMissingBaseUrl',
     externalApiInvalidBaseUrl: 'externalApi.errorInvalidBaseUrl',
     externalApiInsecureUrl: 'externalApi.errorInsecureUrl',

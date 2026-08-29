@@ -33,12 +33,25 @@ chrome.runtime.onMessage.addListener(
         onChunk: (samples) => {
           enqueueChunk(samples, async (chunk) => {
             try {
-              await processAudioChunk(chunk, targetLanguage, sourceLanguage, translation, (update) => {
-                void chrome.runtime.sendMessage<ExtensionMessage>({
-                  type: 'TRANSCRIPT_UPDATE',
-                  payload: update,
-                })
-              })
+              await processAudioChunk(
+                chunk,
+                targetLanguage,
+                sourceLanguage,
+                translation,
+                (update) => {
+                  void chrome.runtime.sendMessage<ExtensionMessage>({
+                    type: 'TRANSCRIPT_UPDATE',
+                    payload: update,
+                  })
+                },
+                (errorCode) => {
+                  console.error('[AuraLang] Translation error:', errorCode)
+                  void chrome.runtime.sendMessage<ExtensionMessage>({
+                    type: 'ERROR',
+                    payload: { message: errorCode },
+                  })
+                },
+              )
             } catch (err) {
               const msg = err instanceof Error ? err.message : 'Pipeline error'
               console.error('[AuraLang] Pipeline error:', msg)

@@ -75,7 +75,7 @@ describe('Given a page with a playing video', () => {
 
     sendToSubtitleOverlay({
       type: 'VIDEO_SUBTITLE_UPDATE',
-      payload: { original: 'Hello world', translated: '你好，世界' },
+      payload: { segmentId: 1, original: 'Hello world', translated: '你好，世界' },
     })
 
     const overlay = document.getElementById(VIDEO_SUBTITLE_OVERLAY_ID)
@@ -99,7 +99,7 @@ describe('Given a page with a playing video', () => {
 
     sendToSubtitleOverlay({
       type: 'VIDEO_SUBTITLE_UPDATE',
-      payload: { original: 'Hello world', translated: '你好，世界' },
+      payload: { segmentId: 1, original: 'Hello world', translated: '你好，世界' },
     })
 
     const overlay = document.getElementById(VIDEO_SUBTITLE_OVERLAY_ID)
@@ -111,7 +111,7 @@ describe('Given a page with a playing video', () => {
     installVideoSubtitleOverlay()
     sendToSubtitleOverlay({
       type: 'VIDEO_SUBTITLE_UPDATE',
-      payload: { original: 'Hello world', translated: '你好，世界' },
+      payload: { segmentId: 1, original: 'Hello world', translated: '你好，世界' },
     })
 
     sendToSubtitleOverlay({ type: 'DISPOSE_VIDEO_SUBTITLE_OVERLAY' })
@@ -119,5 +119,44 @@ describe('Given a page with a playing video', () => {
     expect(document.getElementById(VIDEO_SUBTITLE_OVERLAY_ID)).toBeNull()
     expect(document.getElementById(VIDEO_SUBTITLE_OVERLAY_STYLE_ID)).toBeNull()
     expect(messageListeners.size).toBe(0)
+  })
+
+  it('When an older translation arrives after a newer original, Then it keeps the newer subtitle on screen', () => {
+    createVideo()
+    installVideoSubtitleOverlay()
+
+    sendToSubtitleOverlay({
+      type: 'VIDEO_SUBTITLE_UPDATE',
+      payload: { segmentId: 1, original: 'First sentence', translated: null },
+    })
+    sendToSubtitleOverlay({
+      type: 'VIDEO_SUBTITLE_UPDATE',
+      payload: { segmentId: 2, original: 'Second sentence', translated: null },
+    })
+    sendToSubtitleOverlay({
+      type: 'VIDEO_SUBTITLE_UPDATE',
+      payload: { segmentId: 1, original: 'First sentence', translated: '第一句' },
+    })
+
+    const overlay = document.getElementById(VIDEO_SUBTITLE_OVERLAY_ID)
+    expect(overlay?.textContent).toContain('Second sentence')
+    expect(overlay?.textContent).not.toContain('第一句')
+  })
+
+  it('When an untranslated update arrives after the same segment is translated, Then it keeps the completed subtitle', () => {
+    createVideo()
+    installVideoSubtitleOverlay()
+
+    sendToSubtitleOverlay({
+      type: 'VIDEO_SUBTITLE_UPDATE',
+      payload: { segmentId: 1, original: 'First sentence', translated: '第一句' },
+    })
+    sendToSubtitleOverlay({
+      type: 'VIDEO_SUBTITLE_UPDATE',
+      payload: { segmentId: 1, original: 'First sentence', translated: null },
+    })
+
+    const overlay = document.getElementById(VIDEO_SUBTITLE_OVERLAY_ID)
+    expect(overlay?.textContent).toContain('第一句')
   })
 })

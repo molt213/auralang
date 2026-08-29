@@ -48,6 +48,7 @@ describe('Given the active tab is being translated', () => {
 
   it('When a translated transcript arrives, Then it forwards the update to that tab', async () => {
     const transcript: TranscriptUpdatePayload = {
+      segmentId: 1,
       original: 'Hello world',
       translated: '你好，世界',
     }

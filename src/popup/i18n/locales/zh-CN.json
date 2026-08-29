@@ -31,6 +31,7 @@
   "provider.google": "Google 免费翻译",
   "google.errorRequestFailed": "Google 翻译请求失败，请重试。",
   "error.unknown": "出现问题，请重试。",
+  "error.translationFailed": "翻译失败，请重试。",
   "provider.externalApi": "外接 API",
   "provider.googleHint": "使用 Google 翻译，无需 API Key。",
   "provider.externalApiHint": "使用你配置的兼容 OpenAI 的 API，并按该服务的计费规则使用。",

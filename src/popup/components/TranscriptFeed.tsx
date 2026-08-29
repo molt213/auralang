@@ -50,20 +50,20 @@ export function TranscriptFeed({
           const isSpeaking = speakingOriginal !== null && entry.original === speakingOriginal
           return (
             <div
-              key={i}
+              key={entry.segmentId}
               ref={isSpeaking ? speakingRef : undefined}
               className={`flex animate-fade-in flex-col gap-0.5 rounded-lg px-2 py-1 transition-colors ${
                 isSpeaking ? 'bg-brand-purple/10' : i === transcripts.length - 1 ? '' : 'opacity-70'
               }`}
             >
               <p className="text-caption leading-snug text-muted">{entry.original}</p>
-              {entry.translated === null ? (
-                // Pending translation: a soft pulse instead of a label that
-                // snaps to the final text, so the transition reads as fluid.
+              {entry.translated === null && i === transcripts.length - 1 ? (
+                // Only the latest line remains eligible for translation in the
+                // live queue; older lines stay readable without a stale spinner.
                 <p className="animate-pulse text-body italic leading-snug text-muted">
                   {translatingLabel}
                 </p>
-              ) : (
+              ) : entry.translated !== null ? (
                 <p
                   className={`animate-fade-in text-body leading-snug ${
                     isSpeaking ? 'font-semibold text-brand-purple' : 'text-[var(--text-primary)]'
@@ -71,7 +71,7 @@ export function TranscriptFeed({
                 >
                   {entry.translated}
                 </p>
-              )}
+              ) : null}
             </div>
           )
         })

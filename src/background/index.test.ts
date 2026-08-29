@@ -73,6 +73,7 @@ describe('Given a restarted service worker with an active capture session', () =
     if (!messageListener) throw new Error('The background message listener was not registered')
 
     const transcript: TranscriptUpdatePayload = {
+      segmentId: 1,
       original: 'Hello world',
       translated: '你好，世界',
     }

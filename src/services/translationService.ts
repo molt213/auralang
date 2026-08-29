@@ -56,6 +56,7 @@ async function translateWithGoogle(
   text: string,
   targetLang: string,
   sourceLang: string,
+  signal?: AbortSignal,
 ): Promise<string> {
   const params = new URLSearchParams({
     client: 'gtx',
@@ -65,7 +66,7 @@ async function translateWithGoogle(
     q: text,
   })
 
-  const response = await fetch(`${TRANSLATE_URL}?${params.toString()}`)
+  const response = await fetch(`${TRANSLATE_URL}?${params.toString()}`, { signal })
   if (!response.ok) throw new Error(`googleTranslationRequestFailed:${response.status}`)
 
   const data = (await response.json()) as Array<Array<Array<string>>>
@@ -86,6 +87,7 @@ async function translateWithOpenAiCompatibleApi(
   targetLang: string,
   sourceLang: string,
   config: TranslationConfig,
+  signal?: AbortSignal,
 ): Promise<string> {
   externalApiPermissionOrigin(config)
 
@@ -103,6 +105,7 @@ async function translateWithOpenAiCompatibleApi(
         { role: 'user', content: text },
       ],
     }),
+    signal,
   })
 
   if (!response.ok) throw new Error(`externalApiRequestFailed:${response.status}`)
@@ -121,10 +124,11 @@ export async function translateText(
   targetLang: string,
   sourceLang: string,
   config: TranslationConfig = defaultTranslationConfig,
+  signal?: AbortSignal,
 ): Promise<string> {
   if (!text.trim()) return ''
 
   return config.provider === 'openai-compatible'
-    ? translateWithOpenAiCompatibleApi(text, targetLang, sourceLang, config)
-    : translateWithGoogle(text, targetLang, sourceLang)
+    ? translateWithOpenAiCompatibleApi(text, targetLang, sourceLang, config, signal)
+    : translateWithGoogle(text, targetLang, sourceLang, signal)
 }

@@ -47,6 +47,7 @@ export interface StartCapturePayload {
 export type StartCaptureRequest = Omit<StartCapturePayload, 'streamId'>
 
 export interface TranscriptUpdatePayload {
+  segmentId: number
   original: string
   translated: string | null
 }

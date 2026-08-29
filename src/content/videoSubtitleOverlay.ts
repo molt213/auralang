@@ -69,6 +69,8 @@ export function installVideoSubtitleOverlay(): void {
   let activeVideo: HTMLVideoElement | null = null
   let hasSubtitle = false
   let disposed = false
+  let displayedSegmentId = 0
+  let displayedTranslation = false
 
   function visibleVideo(): HTMLVideoElement | null {
     const candidates = Array.from(document.querySelectorAll('video'))
@@ -193,8 +195,12 @@ export function installVideoSubtitleOverlay(): void {
     if (
       typeof payload !== 'object' ||
       payload === null ||
+      !('segmentId' in payload) ||
       !('original' in payload) ||
       !('translated' in payload) ||
+      typeof payload.segmentId !== 'number' ||
+      !Number.isInteger(payload.segmentId) ||
+      payload.segmentId < 1 ||
       typeof payload.original !== 'string' ||
       (typeof payload.translated !== 'string' && payload.translated !== null)
     ) {
@@ -203,6 +209,12 @@ export function installVideoSubtitleOverlay(): void {
 
     const translated = payload.translated?.trim() ?? ''
     const original = payload.original.trim()
+    if (payload.segmentId < displayedSegmentId) return
+    if (payload.segmentId === displayedSegmentId && !translated && displayedTranslation) return
+
+    displayedSegmentId = payload.segmentId
+    displayedTranslation = Boolean(translated)
+
     if (!translated && !original) {
       hideSubtitles()
       return

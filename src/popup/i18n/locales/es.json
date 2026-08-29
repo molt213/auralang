@@ -31,6 +31,7 @@
   "provider.google": "Google gratis",
   "google.errorRequestFailed": "La solicitud de traducción de Google falló. Inténtalo de nuevo.",
   "error.unknown": "Algo salió mal. Inténtalo de nuevo.",
+  "error.translationFailed": "La traducción falló. Inténtalo de nuevo.",
   "provider.externalApi": "API externa",
   "provider.googleHint": "Usa Google Translate. No se requiere clave de API.",
   "provider.externalApiHint": "Usa tu API compatible con OpenAI y su plan de facturación.",

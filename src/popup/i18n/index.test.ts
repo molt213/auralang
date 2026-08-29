@@ -31,5 +31,6 @@ describe('Given a browser configured to use Chinese', () => {
   it('When the popup uses Simplified Chinese, Then it returns the translated interface copy', () => {
     expect(translate('startTranslation', 'zh-CN')).toBe('开始翻译')
     expect(translate('error.unknown', 'zh-CN')).toBe('出现问题，请重试。')
+    expect(translate('error.translationFailed', 'zh-CN')).toBe('翻译失败，请重试。')
   })
 })

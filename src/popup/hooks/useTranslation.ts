@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import type { TranslationState, ExtensionMessage, UserConfig } from '../../types'
 import { speak, stopSpeech, onSpeakingChange } from '../../services/ttsService'
 import { externalApiPermissionOrigin } from '../../services/translationService'
+import { upsertTranscriptUpdate } from './transcriptUpdates'
 
 export interface UseTranslationReturn {
   state: TranslationState
@@ -97,16 +98,7 @@ export function useTranslation(
           speak(payload.translated, targetLangRef.current, payload.original, voiceVolumeRef.current)
         }
         setState((prev) => {
-          // Each chunk arrives twice: first transcription-only, then with the
-          // translation filled in — same original, so update in place.
-          const transcripts = [...prev.transcripts]
-          const last = transcripts[transcripts.length - 1]
-          if (last && last.original === payload.original) {
-            transcripts[transcripts.length - 1] = payload
-          } else {
-            transcripts.push(payload)
-          }
-          return { ...prev, transcripts: transcripts.slice(-50) }
+          return { ...prev, transcripts: upsertTranscriptUpdate(prev.transcripts, payload) }
         })
       }
     }
