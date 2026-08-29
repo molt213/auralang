@@ -7,7 +7,7 @@ AuraLang is a Chrome extension that translates the audio of your active browser 
 ## What AuraLang accesses
 
 - **Tab audio**: when you click "Start translation," the extension captures the audio stream of your active tab (`tabCapture` permission) in order to transcribe and translate it. The original tab audio is muted while capturing.
-- **Settings**: your source/target language, interface language, and theme (dark/light) are stored locally via `chrome.storage.local`.
+- **Settings**: your source/target language, interface language, theme (dark/light), and optional external API configuration are stored locally via `chrome.storage.local`.
 
 ## What AuraLang does NOT do
 
@@ -18,12 +18,14 @@ AuraLang is a Chrome extension that translates the audio of your active browser 
 ## How audio is processed
 
 1. **Transcription**: audio is transcribed locally, on your own device, using a Whisper model (`@huggingface/transformers`, ONNX Runtime WASM). The model weights (~40–150 MB depending on the variant) are downloaded once from Hugging Face (huggingface.co) and cached locally. Audio never leaves your device for transcription.
-2. **Translation**: the transcribed text is sent to Google's public translation endpoint (`translate.googleapis.com`) solely to obtain the translated text. No other data accompanies this request.
+2. **Translation**: the transcribed text is sent solely to the translation service you select:
+   - **Google free** (the default) sends text to Google's public translation endpoint (`translate.googleapis.com`).
+   - **External API** sends text to the OpenAI-compatible API host and model that you configure. Before connecting to a new external host, AuraLang requests Chrome permission for that specific host.
 3. **Speech**: the translated text is read aloud locally using the browser's built-in Web Speech API (`speechSynthesis`). This does not leave your device.
 
 ## Data retention
 
-Nothing is stored outside your browser. Settings persist in `chrome.storage.local` until you uninstall the extension or clear it manually. Audio and transcribed text are processed in memory and are not saved anywhere.
+Nothing is stored outside your browser by AuraLang. Settings persist in `chrome.storage.local` until you uninstall the extension or clear them manually. An external API key is stored in that local extension storage so it can authorize requests to your chosen host; AuraLang never includes it in the extension bundle or sends it to another host. Audio and transcribed text are processed in memory and are not saved anywhere by AuraLang. Your selected external provider may retain requests under its own policy.
 
 ## Contact
 

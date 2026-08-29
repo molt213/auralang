@@ -1,4 +1,4 @@
-import type { UiLanguage, UiTheme } from '../../types'
+import type { TranslationConfig, TranslationProvider, UiLanguage, UiTheme } from '../../types'
 import type { AsrMode } from '../../asr/types'
 import { CloseIcon } from './Icons'
 import { SegmentedControl } from './SegmentedControl'
@@ -11,6 +11,8 @@ interface SettingsPanelProps {
   uiTheme: UiTheme
   asrMode: AsrMode
   asrModeLocked: boolean
+  translation: TranslationConfig
+  translationLocked: boolean
   // What Auto resolves to on this device, e.g. "En este equipo: Equilibrado · ~290 MB".
   autoResolvedNote: string
   backdropCloseAriaLabel: string
@@ -18,6 +20,10 @@ interface SettingsPanelProps {
   onLanguageChange: (lang: UiLanguage) => void
   onThemeChange: (theme: UiTheme) => void
   onAsrModeChange: (mode: AsrMode) => void
+  onTranslationChange: <K extends keyof TranslationConfig>(
+    key: K,
+    value: TranslationConfig[K],
+  ) => void
   t: (key: MessageKey) => string
 }
 
@@ -28,12 +34,15 @@ export function SettingsPanel({
   uiTheme,
   asrMode,
   asrModeLocked,
+  translation,
+  translationLocked,
   autoResolvedNote,
   backdropCloseAriaLabel,
   closeAriaLabel,
   onLanguageChange,
   onThemeChange,
   onAsrModeChange,
+  onTranslationChange,
   t,
 }: SettingsPanelProps) {
   if (!isOpen) return null
@@ -70,6 +79,79 @@ export function SettingsPanel({
             ]}
           />
         </div>
+
+        <div className="flex flex-col gap-1.5">
+          <span className="text-caption font-medium text-muted">{t('settings.translationProvider')}</span>
+          <SegmentedControl
+            value={translation.provider}
+            onChange={(provider: TranslationProvider) => onTranslationChange('provider', provider)}
+            disabled={translationLocked}
+            options={[
+              { value: 'google', label: t('provider.google') },
+              { value: 'openai-compatible', label: t('provider.externalApi') },
+            ]}
+          />
+          <span className="text-caption leading-snug text-muted">
+            {translation.provider === 'google'
+              ? t('provider.googleHint')
+              : t('provider.externalApiHint')}
+          </span>
+        </div>
+
+        {translation.provider === 'openai-compatible' && (
+          <div className="flex flex-col gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--surface-bg)] p-3">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="external-api-base-url" className="text-caption font-medium text-muted">
+                {t('externalApi.baseUrl')}
+              </label>
+              <input
+                id="external-api-base-url"
+                type="url"
+                value={translation.baseUrl}
+                onChange={(event) => onTranslationChange('baseUrl', event.target.value)}
+                disabled={translationLocked}
+                placeholder={t('externalApi.baseUrlPlaceholder')}
+                autoComplete="off"
+                spellCheck={false}
+                className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--surface-elevated)] px-3 py-2 text-caption text-[var(--text-primary)] outline-none placeholder:text-muted focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="external-api-model" className="text-caption font-medium text-muted">
+                {t('externalApi.model')}
+              </label>
+              <input
+                id="external-api-model"
+                type="text"
+                value={translation.model}
+                onChange={(event) => onTranslationChange('model', event.target.value)}
+                disabled={translationLocked}
+                placeholder={t('externalApi.modelPlaceholder')}
+                autoComplete="off"
+                spellCheck={false}
+                className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--surface-elevated)] px-3 py-2 text-caption text-[var(--text-primary)] outline-none placeholder:text-muted focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="external-api-key" className="text-caption font-medium text-muted">
+                {t('externalApi.apiKey')}
+              </label>
+              <input
+                id="external-api-key"
+                type="password"
+                value={translation.apiKey}
+                onChange={(event) => onTranslationChange('apiKey', event.target.value)}
+                disabled={translationLocked}
+                placeholder={t('externalApi.apiKeyPlaceholder')}
+                autoComplete="new-password"
+                spellCheck={false}
+                className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--surface-elevated)] px-3 py-2 text-caption text-[var(--text-primary)] outline-none placeholder:text-muted focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col gap-1.5">
           <span className="text-caption font-medium text-muted">{t('settings.theme')}</span>

@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import type { TranslationState, ExtensionMessage, UserConfig, TranscriptUpdatePayload } from '../../types'
-import type { ModelStatus } from '../../asr/types'
+import type { TranslationState, ExtensionMessage, UserConfig } from '../../types'
 import { speak, stopSpeech, onSpeakingChange } from '../../services/ttsService'
+import { externalApiPermissionOrigin } from '../../services/translationService'
 
 export interface UseTranslationReturn {
   state: TranslationState
@@ -9,7 +9,7 @@ export interface UseTranslationReturn {
 }
 
 export function useTranslation(
-  config: Pick<UserConfig, 'targetLanguage' | 'sourceLanguage' | 'asrMode' | 'voiceVolume' | 'originalVolume'>,
+  config: Pick<UserConfig, 'targetLanguage' | 'sourceLanguage' | 'asrMode' | 'voiceVolume' | 'originalVolume' | 'translation'>,
 ): UseTranslationReturn {
   const [state, setState] = useState<TranslationState>({
     isActive: false,
@@ -25,9 +25,15 @@ export function useTranslation(
   // document: Chrome throttles speechSynthesis in offscreen docs, so the voice
   // was unreliable/silent. The panel is a focused document with real audio.
   const targetLangRef = useRef(config.targetLanguage)
-  targetLangRef.current = config.targetLanguage
   const voiceVolumeRef = useRef(config.voiceVolume)
-  voiceVolumeRef.current = config.voiceVolume
+
+  useEffect(() => {
+    targetLangRef.current = config.targetLanguage
+  }, [config.targetLanguage])
+
+  useEffect(() => {
+    voiceVolumeRef.current = config.voiceVolume
+  }, [config.voiceVolume])
 
   // Silence the current utterance immediately when the voice is muted.
   useEffect(() => {
@@ -62,7 +68,7 @@ export function useTranslation(
         setState((prev) => ({ ...prev, isModelReady: true }))
       }
       if (message.type === 'MODEL_STATUS') {
-        const payload = message.payload as ModelStatus
+        const payload = message.payload
         setState((prev) => ({
           ...prev,
           modelStatus: payload,
@@ -70,7 +76,7 @@ export function useTranslation(
         }))
       }
       if (message.type === 'ERROR') {
-        const payload = message.payload as { message: string }
+        const payload = message.payload
         setState((prev) => ({ ...prev, error: payload.message }))
       }
       if (message.type === 'CAPTURE_ENDED') {
@@ -83,7 +89,7 @@ export function useTranslation(
         }))
       }
       if (message.type === 'TRANSCRIPT_UPDATE') {
-        const payload = message.payload as TranscriptUpdatePayload
+        const payload = message.payload
         // Speak the translation here in the panel (reliable audio). The chunk
         // arrives twice; the first emit has translated === null, so this only
         // fires once the translation is in. Volume 0 = muted, so skip speaking.
@@ -117,8 +123,22 @@ export function useTranslation(
     }
   }, [])
 
-  const toggle = useCallback(() => {
+  const toggle = useCallback(async () => {
     const starting = !state.isActive
+    if (starting && config.translation.provider === 'openai-compatible') {
+      try {
+        const origin = externalApiPermissionOrigin(config.translation)
+        const granted = await chrome.permissions.request({ origins: [origin] })
+        if (!granted) {
+          throw new Error('externalApiPermissionDenied')
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'externalApiSetupFailed'
+        setState((prev) => ({ ...prev, error: message }))
+        return
+      }
+    }
+
     stopSpeech() // cut any queued/current utterance on both start and stop
     // Clear the transcript only when starting a new session — keep it visible
     // after Stop so the user can still read what was said.
@@ -129,20 +149,21 @@ export function useTranslation(
       ...(starting ? { transcripts: [], speakingOriginal: null } : {}),
     }))
 
-    const type: ExtensionMessage['type'] = state.isActive ? 'STOP_CAPTURE' : 'START_CAPTURE'
+    const message: ExtensionMessage = state.isActive
+      ? { type: 'STOP_CAPTURE' }
+      : {
+          type: 'START_CAPTURE',
+          payload: {
+            targetLanguage: config.targetLanguage,
+            sourceLanguage: config.sourceLanguage,
+            asrMode: config.asrMode,
+            originalVolume: config.originalVolume,
+            translation: config.translation,
+          },
+        }
 
     chrome.runtime.sendMessage<ExtensionMessage>(
-      {
-        type,
-        payload: state.isActive
-          ? undefined
-          : {
-              targetLanguage: config.targetLanguage,
-              sourceLanguage: config.sourceLanguage,
-              asrMode: config.asrMode,
-              originalVolume: config.originalVolume,
-            },
-      },
+      message,
       (response: { success: boolean; error?: string }) => {
         if (chrome.runtime.lastError || !response?.success) {
           setState((prev) => ({
@@ -159,7 +180,7 @@ export function useTranslation(
         }))
       },
     )
-  }, [state.isActive, config.targetLanguage, config.sourceLanguage, config.asrMode, config.originalVolume])
+  }, [state.isActive, config.targetLanguage, config.sourceLanguage, config.asrMode, config.originalVolume, config.translation])
 
   return { state, toggle }
 }

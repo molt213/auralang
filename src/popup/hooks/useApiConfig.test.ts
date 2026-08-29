@@ -25,7 +25,7 @@ function mockChrome(): void {
   })
 }
 
-describe('useApiConfig', () => {
+describe('Given the saved AuraLang configuration', () => {
   beforeEach(() => {
     jest.useFakeTimers()
     getMock.mockReset()
@@ -50,7 +50,7 @@ describe('useApiConfig', () => {
     jest.useRealTimers()
   })
 
-  it('loads config from chrome.storage.local on mount', async () => {
+  it('When the hook mounts with a legacy configuration, Then it uses Google translation defaults', async () => {
     const { result } = renderHook(() => useApiConfig())
 
     await waitFor(() => expect(result.current.isLoaded).toBe(true))
@@ -60,11 +60,17 @@ describe('useApiConfig', () => {
       sourceLanguage: 'en',
       uiLanguage: 'es',
       uiTheme: 'light',
+      translation: {
+        provider: 'google',
+        baseUrl: '',
+        model: '',
+        apiKey: '',
+      },
     })
     expect(setMock).not.toHaveBeenCalled()
   })
 
-  it('persists updates after debounce delay', async () => {
+  it('When a setting changes, Then it persists the update after the debounce delay', async () => {
     const { result } = renderHook(() => useApiConfig())
     await waitFor(() => expect(result.current.isLoaded).toBe(true))
 

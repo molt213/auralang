@@ -2,7 +2,7 @@ import { startAudioCapture, stopAudioCapture } from './audioCapture'
 import { processAudioChunk, resetPipelineState } from './pipeline'
 import { onAsrModelStatus, setAsrMode } from './asrClient'
 import { enqueueChunk, clearQueue } from '../asr/inferenceQueue'
-import type { ExtensionMessage, StartCapturePayload } from '../types'
+import type { ExtensionMessage } from '../types'
 
 let modelReady = false
 
@@ -22,8 +22,8 @@ onAsrModelStatus((status) => {
 chrome.runtime.onMessage.addListener(
   (message: ExtensionMessage, _sender, sendResponse) => {
     if (message.type === 'BEGIN_STREAM') {
-      const { streamId, targetLanguage, sourceLanguage, asrMode, originalVolume } =
-        message.payload as StartCapturePayload
+      const { streamId, targetLanguage, sourceLanguage, asrMode, originalVolume, translation } =
+        message.payload
 
       // Guarantee the selected tier is (loading) before capture, in case the
       // popup's preload SET_ASR_MODE never reached us. No-op if already loaded.
@@ -33,7 +33,7 @@ chrome.runtime.onMessage.addListener(
         onChunk: (samples) => {
           enqueueChunk(samples, async (chunk) => {
             try {
-              await processAudioChunk(chunk, targetLanguage, sourceLanguage, (update) => {
+              await processAudioChunk(chunk, targetLanguage, sourceLanguage, translation, (update) => {
                 void chrome.runtime.sendMessage<ExtensionMessage>({
                   type: 'TRANSCRIPT_UPDATE',
                   payload: update,

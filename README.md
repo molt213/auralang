@@ -7,7 +7,7 @@
 
 <p align="center">
   <strong>Real-time audio translation for any browser tab.</strong><br>
-  Transcribes locally with Whisper, translates, and reads it back aloud — no API key, no account.
+  Transcribes locally with Whisper, translates, and reads it back aloud — free by default, with optional external AI APIs.
 </p>
 
 <p align="center">
@@ -40,16 +40,32 @@ Watching a talk, a podcast, or a video in a language you don't speak? AuraLang l
 - 🗣️ **Spoken translation** — the original tab audio is muted; you only hear the translation.
 - 📊 **Live transcript with karaoke** — read the original + translation in a side panel; the line being spoken is highlighted.
 - 🎚️ **Model modes** — Auto / Light (whisper-tiny) / Balanced (whisper-base): trade speed for accuracy per your device.
-- 🔒 **No key, no account, no backend** — settings live only in your browser.
+- 🔒 **Free by default** — Google Translate needs no key; an external OpenAI-compatible API is optional.
 - 🌗 **Light & dark themes**, interface in **English and Spanish**.
 
 ## ⚙️ How it works
 
 ```
-Tab audio ─▶ Whisper (local transcription) ─▶ Google Translate ─▶ Web Speech API (spoken output)
+Tab audio ─▶ Whisper (local transcription) ─▶ Google Translate or your external API ─▶ Web Speech API (spoken output)
 ```
 
 Audio is buffered and cut on natural speech pauses, transcribed on-device, translated, and read aloud through the browser's built-in voice. The original tab audio is muted while capturing.
+
+## 🔌 Use an external AI API
+
+The default **Google free** translation service does not require a key. To use an AI model instead, open **Settings** and choose **External API**. AuraLang accepts the OpenAI chat-completions format, so it works with OpenAI and compatible providers such as DeepSeek, Groq, OpenRouter, SiliconFlow, or a local Ollama server.
+
+Enter the provider's API base URL, model name, and API key. AuraLang appends `/chat/completions` when necessary. When you start translation for the first time with a new API host, Chrome asks for permission to contact that host; declining the request keeps translation stopped.
+
+Examples:
+
+| Provider | API base URL | Model name |
+| --- | --- | --- |
+| OpenAI | `https://api.openai.com/v1` | `gpt-4o-mini` |
+| DeepSeek | `https://api.deepseek.com/v1` | `deepseek-chat` |
+| Ollama (local) | `http://localhost:11434/v1` | your locally installed model |
+
+Your key is stored only in `chrome.storage.local` for this browser profile. It is never included in the extension bundle or sent anywhere other than the API host you select. External providers may charge for API use; check the provider's pricing before starting a stream.
 
 ## 🚀 Run it locally
 
@@ -89,7 +105,7 @@ npm run zip         # Build + package dist.zip for the Web Store
 | UI | React 18 + TypeScript (strict) |
 | Styles | Tailwind CSS |
 | Transcription | Whisper via `@huggingface/transformers` (local, offscreen document) |
-| Translation | Google Translate (free, unofficial endpoint) |
+| Translation | Google Translate (free, default) or a user-configured OpenAI-compatible API |
 | Speech | Web Speech API (`speechSynthesis`) |
 
 ## 📁 Project structure
@@ -109,7 +125,7 @@ src/
 
 ## 🔐 Privacy
 
-No backend, no telemetry, no account. Transcription happens on your device; only the transcribed **text** is sent to Google Translate to get the translation back. Settings (languages, theme) are stored in `chrome.storage.local` on your machine. Full details in [PRIVACY.md](./PRIVACY.md).
+No backend, no telemetry, no account. Transcription happens on your device; the transcribed **text** is sent only to the selected translation service. Settings, including an optional external API key, are stored in `chrome.storage.local` on your machine. Full details in [PRIVACY.md](./PRIVACY.md).
 
 ## 📚 Docs
 

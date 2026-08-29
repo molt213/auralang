@@ -3,7 +3,7 @@ import { translateText } from '../services/translationService'
 import { stopSpeech } from '../services/ttsService'
 import { isSilent } from '../utils/audioLevel'
 import { isSilenceHallucination, stripSeamRepeat } from '../utils/text'
-import type { TranscriptUpdatePayload } from '../types'
+import type { TranscriptUpdatePayload, TranslationConfig } from '../types'
 
 let lastTranscription = ''
 // Bumped on every stop/reset so in-flight processAudioChunk calls started
@@ -21,6 +21,7 @@ export async function processAudioChunk(
   samples: Float32Array,
   targetLang: string,
   sourceLang: string,
+  translationConfig: TranslationConfig,
   onTranscript: (update: TranscriptUpdatePayload) => void,
 ): Promise<void> {
   if (isSilent(samples)) return
@@ -44,7 +45,7 @@ export async function processAudioChunk(
   lastTranscription = transcription
   onTranscript({ original: transcription, translated: null })
 
-  const translation = await translateText(transcription, targetLang, sourceLang)
+  const translation = await translateText(transcription, targetLang, sourceLang, translationConfig)
   if (sessionId !== mySession) return
   if (!translation) return
 

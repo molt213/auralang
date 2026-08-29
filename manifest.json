@@ -11,6 +11,14 @@
     "activeTab",
     "sidePanel"
   ],
+  "host_permissions": [
+    "https://translate.googleapis.com/*"
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
   "background": {
     "service_worker": "src/background/index.ts",
     "type": "module"

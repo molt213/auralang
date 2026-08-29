@@ -17,7 +17,7 @@ import { SettingsPanel } from './components/SettingsPanel'
 import { VolumeSlider } from './components/VolumeSlider'
 import { TranscriptFeed } from './components/TranscriptFeed'
 import { PlayIcon, StopIcon } from './components/Icons'
-import type { UiLanguage, UiTheme } from '../types'
+import type { TranslationConfig, UiLanguage, UiTheme } from '../types'
 import type { AsrMode } from '../asr/types'
 import { tierForMode } from '../asr/registry'
 
@@ -104,12 +104,17 @@ export default function App() {
           uiTheme={config.uiTheme}
           asrMode={config.asrMode}
           asrModeLocked={translation.isActive}
+          translation={config.translation}
+          translationLocked={translation.isActive}
           autoResolvedNote={autoResolvedNote}
           backdropCloseAriaLabel={t('settings.backdropAriaLabel')}
           closeAriaLabel={t('settings.closeAriaLabel')}
           onLanguageChange={(lang: UiLanguage) => updateField('uiLanguage', lang)}
           onThemeChange={(theme: UiTheme) => updateField('uiTheme', theme)}
           onAsrModeChange={(mode: AsrMode) => updateField('asrMode', mode)}
+          onTranslationChange={<K extends keyof TranslationConfig>(key: K, value: TranslationConfig[K]) => {
+            updateField('translation', { ...config.translation, [key]: value })
+          }}
           t={t}
         />
 

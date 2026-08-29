@@ -2,6 +2,14 @@ import type { AsrMode, ModelStatus } from '../asr/types'
 
 export type UiLanguage = 'en' | 'es'
 export type UiTheme = 'dark' | 'light'
+export type TranslationProvider = 'google' | 'openai-compatible'
+
+export interface TranslationConfig {
+  provider: TranslationProvider
+  baseUrl: string
+  model: string
+  apiKey: string
+}
 
 export interface UserConfig {
   targetLanguage: string
@@ -13,6 +21,7 @@ export interface UserConfig {
   voiceVolume: number
   // Original tab audio volume, 0 (muted) to 1 (full).
   originalVolume: number
+  translation: TranslationConfig
 }
 
 export interface TranslationState {
@@ -26,34 +35,16 @@ export interface TranslationState {
   speakingOriginal: string | null
 }
 
-export type MessageType =
-  | 'START_CAPTURE'       // popup → background
-  | 'STOP_CAPTURE'        // popup → background
-  | 'BEGIN_STREAM'        // background → offscreen (includes streamId)
-  | 'END_STREAM'          // background → offscreen
-  | 'MODEL_READY'
-  | 'MODEL_STATUS'        // offscreen → popup (download progress, probe, ready, error)
-  | 'GET_CAPTURE_STATE'
-  | 'CAPTURE_ENDED'       // offscreen → background/popup (source tab closed or stream lost)
-  | 'TRANSCRIPT_UPDATE'   // offscreen → popup (live transcription/translation text)
-  | 'ERROR'
-
-export interface ExtensionMessage {
-  type: MessageType
-  payload?: unknown
-}
-
 export interface StartCapturePayload {
   streamId: string
   targetLanguage: string
   sourceLanguage: string
   asrMode: AsrMode
   originalVolume: number
+  translation: TranslationConfig
 }
 
-export interface TranslationResultPayload {
-  text: string
-}
+export type StartCaptureRequest = Omit<StartCapturePayload, 'streamId'>
 
 export interface TranscriptUpdatePayload {
   original: string
@@ -63,3 +54,15 @@ export interface TranscriptUpdatePayload {
 export interface ErrorPayload {
   message: string
 }
+
+export type ExtensionMessage =
+  | { type: 'START_CAPTURE'; payload: StartCaptureRequest }
+  | { type: 'STOP_CAPTURE' }
+  | { type: 'BEGIN_STREAM'; payload: StartCapturePayload }
+  | { type: 'END_STREAM' }
+  | { type: 'MODEL_READY' }
+  | { type: 'MODEL_STATUS'; payload: ModelStatus }
+  | { type: 'GET_CAPTURE_STATE' }
+  | { type: 'CAPTURE_ENDED' }
+  | { type: 'TRANSCRIPT_UPDATE'; payload: TranscriptUpdatePayload }
+  | { type: 'ERROR'; payload: ErrorPayload }
