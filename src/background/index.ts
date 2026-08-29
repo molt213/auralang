@@ -109,7 +109,7 @@ async function beginCaptureForTab(
     capturedTabId = tabId
     await startCapture({ streamId, targetLanguage, sourceLanguage, asrMode, originalVolume, translation })
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Unknown error'
+    const msg = err instanceof Error ? err.message : 'unknownError'
     // Stale session from a tab that closed without a clean STOP_CAPTURE — clear
     // our own state and retry once before giving up.
     if (!isRetry && msg.includes('active stream')) {
@@ -136,7 +136,7 @@ chrome.runtime.onMessage.addListener(
         beginCaptureForTab(tabId, targetLanguage, sourceLanguage, asrMode, originalVolume, translation)
           .then(() => sendResponse({ success: true }))
           .catch((err: unknown) => {
-            const msg = err instanceof Error ? err.message : 'Unknown error'
+            const msg = err instanceof Error ? err.message : 'unknownError'
             sendResponse({ success: false, error: msg })
           })
       })
@@ -147,7 +147,7 @@ chrome.runtime.onMessage.addListener(
       stopCapture()
         .then(() => sendResponse({ success: true }))
         .catch((err: unknown) => {
-          const msg = err instanceof Error ? err.message : 'Unknown error'
+          const msg = err instanceof Error ? err.message : 'unknownError'
           sendResponse({ success: false, error: msg })
         })
       return true

@@ -69,7 +69,7 @@ describe('Given text to translate', () => {
       http.get(TRANSLATE_URL, () => new HttpResponse(null, { status: 500 })),
     )
 
-    await expect(translateText('Hello world', 'es', 'en')).rejects.toThrow('Translation failed: 500')
+    await expect(translateText('Hello world', 'es', 'en')).rejects.toThrow('googleTranslationRequestFailed:500')
   })
 
   it('When an OpenAI-compatible API is configured, Then it returns that API translation', async () => {

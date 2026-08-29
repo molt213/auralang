@@ -1,0 +1,8 @@
+{
+  "extensionName": {
+    "message": "AuraLang"
+  },
+  "extensionDescription": {
+    "message": "Translate audio from any tab in real time. Local Whisper transcription, no API key or account required."
+  }
+}

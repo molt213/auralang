@@ -1,13 +1,23 @@
 import type { UiLanguage } from '../../types'
 import en from './locales/en.json'
 import es from './locales/es.json'
+import zhCN from './locales/zh-CN.json'
 
 type Messages = typeof en
 
-const locales: Record<UiLanguage, Messages> = { en, es }
+const locales: Record<UiLanguage, Messages> = { en, es, 'zh-CN': zhCN }
 
 export function detectBrowserLocale(): UiLanguage {
-  if (typeof navigator !== 'undefined' && navigator.language.startsWith('es')) {
+  const browserLanguage = typeof navigator !== 'undefined' ? navigator.language.toLowerCase() : ''
+  if (
+    browserLanguage === 'zh' ||
+    browserLanguage.startsWith('zh-cn') ||
+    browserLanguage.startsWith('zh-sg') ||
+    browserLanguage.includes('-hans')
+  ) {
+    return 'zh-CN'
+  }
+  if (browserLanguage.startsWith('es')) {
     return 'es'
   }
   return 'en'

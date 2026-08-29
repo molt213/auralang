@@ -1,4 +1,12 @@
 const translations = {
+  'zh-CN': {
+    title: 'AuraLang 已安装',
+    subtitle: '将扩展固定到工具栏，即可一键使用实时翻译。',
+    step1a: '点击 Chrome 地址栏中的',
+    step1b: '图标。',
+    step2: '在列表中找到 AuraLang，点击图钉将它固定。',
+    hint: '↑ 它位于右上角、搜索栏旁边。',
+  },
   es: {
     title: 'AuraLang instalado',
     subtitle: 'Fija la extensión para acceder a la traducción en tiempo real con un clic.',
@@ -20,7 +28,16 @@ const translations = {
 type Locale = keyof typeof translations
 
 function resolveLocale(): Locale {
-  return navigator.language.toLowerCase().startsWith('es') ? 'es' : 'en'
+  const browserLanguage = navigator.language.toLowerCase()
+  if (
+    browserLanguage === 'zh' ||
+    browserLanguage.startsWith('zh-cn') ||
+    browserLanguage.startsWith('zh-sg') ||
+    browserLanguage.includes('-hans')
+  ) {
+    return 'zh-CN'
+  }
+  return browserLanguage.startsWith('es') ? 'es' : 'en'
 }
 
 function applyTranslations(): void {

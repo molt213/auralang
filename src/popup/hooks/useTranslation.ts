@@ -169,7 +169,7 @@ export function useTranslation(
           setState((prev) => ({
             ...prev,
             isLoading: false,
-            error: chrome.runtime.lastError?.message ?? response?.error ?? 'Unknown error',
+            error: chrome.runtime.lastError?.message ?? response?.error ?? 'unknownError',
           }))
           return
         }

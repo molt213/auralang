@@ -1,0 +1,8 @@
+{
+  "extensionName": {
+    "message": "AuraLang"
+  },
+  "extensionDescription": {
+    "message": "实时翻译任意标签页的音频。本地 Whisper 转写，无需 API Key 或账号。"
+  }
+}

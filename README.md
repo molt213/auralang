@@ -41,7 +41,7 @@ Watching a talk, a podcast, or a video in a language you don't speak? AuraLang l
 - 📊 **Live transcript with karaoke** — read the original + translation in a side panel; the line being spoken is highlighted.
 - 🎚️ **Model modes** — Auto / Light (whisper-tiny) / Balanced (whisper-base): trade speed for accuracy per your device.
 - 🔒 **Free by default** — Google Translate needs no key; an external OpenAI-compatible API is optional.
-- 🌗 **Light & dark themes**, interface in **English and Spanish**.
+- 🌗 **Light & dark themes**, interface in **English, Spanish, and Simplified Chinese**.
 
 ## ⚙️ How it works
 

@@ -11,6 +11,7 @@ interface UseErrorToastsOptions {
 function friendlyMessage(error: string, t: (key: MessageKey) => string): string {
   if (error === 'captureEnded') return t('captureEnded')
   const translatedErrors: Partial<Record<string, MessageKey>> = {
+    unknownError: 'error.unknown',
     externalApiMissingBaseUrl: 'externalApi.errorMissingBaseUrl',
     externalApiInvalidBaseUrl: 'externalApi.errorInvalidBaseUrl',
     externalApiInsecureUrl: 'externalApi.errorInsecureUrl',
@@ -22,6 +23,9 @@ function friendlyMessage(error: string, t: (key: MessageKey) => string): string 
   }
   if (error.startsWith('externalApiRequestFailed:')) {
     return t('externalApi.errorRequestFailed')
+  }
+  if (error.startsWith('googleTranslationRequestFailed:')) {
+    return t('google.errorRequestFailed')
   }
   const translatedError = translatedErrors[error]
   if (translatedError) return t(translatedError)

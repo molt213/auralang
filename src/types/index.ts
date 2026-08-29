@@ -1,6 +1,6 @@
 import type { AsrMode, ModelStatus } from '../asr/types'
 
-export type UiLanguage = 'en' | 'es'
+export type UiLanguage = 'en' | 'es' | 'zh-CN'
 export type UiTheme = 'dark' | 'light'
 export type TranslationProvider = 'google' | 'openai-compatible'
 

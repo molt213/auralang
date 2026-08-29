@@ -29,7 +29,7 @@ The project uses:
 - Vite + `@crxjs/vite-plugin`.
 - React 18 with **TypeScript** (strict mode).
 - Tailwind CSS.
-- i18n for popup copy (`en` / `es`).
+- i18n for popup copy (`en` / `es` / `zh-CN`).
 
 Use:
 

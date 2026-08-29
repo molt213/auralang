@@ -74,7 +74,10 @@ export function useApiConfig(): UseUserConfigReturn {
           ...prev,
           targetLanguage: storedString(stored.targetLanguage, prev.targetLanguage),
           sourceLanguage: storedString(stored.sourceLanguage, prev.sourceLanguage),
-          uiLanguage: stored.uiLanguage === 'es' ? 'es' : stored.uiLanguage === 'en' ? 'en' : prev.uiLanguage,
+          uiLanguage:
+            stored.uiLanguage === 'es' || stored.uiLanguage === 'en' || stored.uiLanguage === 'zh-CN'
+              ? stored.uiLanguage
+              : prev.uiLanguage,
           uiTheme: stored.uiTheme === 'light' ? 'light' : stored.uiTheme === 'dark' ? 'dark' : prev.uiTheme,
           asrMode: stored.asrMode === 'light' || stored.asrMode === 'balanced' || stored.asrMode === 'auto'
             ? stored.asrMode

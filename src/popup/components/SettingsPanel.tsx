@@ -74,8 +74,9 @@ export function SettingsPanel({
             value={uiLanguage}
             onChange={onLanguageChange}
             options={[
-              { value: 'en', label: 'English' },
-              { value: 'es', label: 'Español' },
+              { value: 'en', label: t('languageName.english') },
+              { value: 'es', label: t('languageName.spanish') },
+              { value: 'zh-CN', label: t('languageName.simplifiedChinese') },
             ]}
           />
         </div>

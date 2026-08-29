@@ -1,0 +1,8 @@
+{
+  "extensionName": {
+    "message": "AuraLang"
+  },
+  "extensionDescription": {
+    "message": "Traduce el audio de cualquier pestaña en tiempo real. Transcripción local con Whisper, sin clave de API ni cuenta."
+  }
+}

@@ -66,7 +66,7 @@ async function translateWithGoogle(
   })
 
   const response = await fetch(`${TRANSLATE_URL}?${params.toString()}`)
-  if (!response.ok) throw new Error(`Translation failed: ${response.status}`)
+  if (!response.ok) throw new Error(`googleTranslationRequestFailed:${response.status}`)
 
   const data = (await response.json()) as Array<Array<Array<string>>>
   return data[0]?.map((chunk) => chunk[0]).join('') ?? ''

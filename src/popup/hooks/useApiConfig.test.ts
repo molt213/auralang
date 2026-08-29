@@ -70,6 +70,25 @@ describe('Given the saved AuraLang configuration', () => {
     expect(setMock).not.toHaveBeenCalled()
   })
 
+  it('When the saved interface language is Simplified Chinese, Then it restores that preference', async () => {
+    getMock.mockImplementationOnce((_key, callback) => {
+      callback({
+        auralang_config: {
+          targetLanguage: 'fr',
+          sourceLanguage: 'en',
+          uiLanguage: 'zh-CN',
+          uiTheme: 'light',
+        },
+      })
+    })
+
+    const { result } = renderHook(() => useApiConfig())
+
+    await waitFor(() => expect(result.current.isLoaded).toBe(true))
+
+    expect(result.current.config.uiLanguage).toBe('zh-CN')
+  })
+
   it('When a setting changes, Then it persists the update after the debounce delay', async () => {
     const { result } = renderHook(() => useApiConfig())
     await waitFor(() => expect(result.current.isLoaded).toBe(true))
