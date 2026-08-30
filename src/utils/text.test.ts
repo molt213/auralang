@@ -88,6 +88,19 @@ describe('isRepetitionHallucination', () => {
     expect(isRepetitionHallucination(`この子供${'の子供'.repeat(8)}`)).toBe(true)
   })
 
+  it('Given an ASR result that moves between repeated Japanese syllable loops, When it is checked, Then it is still treated as a hallucination', () => {
+    const text = `さあなこの全ていいねおけるけい${'ろい'.repeat(80)}${'ろいろ'.repeat(40)}${'ろ'.repeat(80)}`
+
+    expect(isRepetitionHallucination(text)).toBe(true)
+  })
+
+  it('Given a long normal lead-in followed by a looping syllable run, When it is checked, Then the late loop is still treated as a hallucination', () => {
+    const leadIn =
+      '今日は新しい動画の内容を確認しながら、配信者が話している設定と進行の流れを一つずつ丁寧に説明しています。視聴者からの質問にも順番に答えて、次の場面へ進む準備をしています。'
+
+    expect(isRepetitionHallucination(`${leadIn}${'ろ'.repeat(24)}`)).toBe(true)
+  })
+
   it('Given normal Japanese speech or a short natural repetition, When it is checked, Then it remains translatable', () => {
     expect(
       isRepetitionHallucination(
