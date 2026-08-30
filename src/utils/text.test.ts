@@ -13,10 +13,16 @@ describe('isSilenceHallucination', () => {
     expect(isSilenceHallucination('Thanks for watching!')).toBe(true)
   })
 
+  it('Given Whisper emits the Japanese outro phrase without matching audio, When the whole result is checked, Then it is treated as a silence hallucination', () => {
+    expect(isSilenceHallucination('ご視聴ありがとうございました')).toBe(true)
+    expect(isSilenceHallucination('ご視聴ありがとうございました。')).toBe(true)
+  })
+
   it('never matches real sentences containing those words', () => {
     expect(isSilenceHallucination('you are here')).toBe(false)
     expect(isSilenceHallucination('thank you for the coffee')).toBe(false)
     expect(isSilenceHallucination("I'm gonna go get some of that.")).toBe(false)
+    expect(isSilenceHallucination('最後までご視聴ありがとうございました。')).toBe(false)
   })
 
   it('does not match empty text', () => {

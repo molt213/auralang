@@ -12,6 +12,7 @@ const SILENCE_HALLUCINATIONS = new Set([
   'thank you for watching',
   'please subscribe',
   'bye',
+  'ご視聴ありがとうございました',
 ])
 
 const MIN_LOOPING_TEXT_LENGTH = 24
