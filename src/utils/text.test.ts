@@ -1,4 +1,9 @@
-import { collapseRepeats, isSilenceHallucination, stripSeamRepeat } from './text'
+import {
+  collapseRepeats,
+  isRepetitionHallucination,
+  isSilenceHallucination,
+  stripSeamRepeat,
+} from './text'
 
 describe('isSilenceHallucination', () => {
   it('matches known fillers regardless of case and punctuation', () => {
@@ -67,5 +72,28 @@ describe('collapseRepeats', () => {
   it('returns normal text unchanged', () => {
     expect(collapseRepeats('el código no es perfecto')).toBe('el código no es perfecto')
     expect(collapseRepeats('')).toBe('')
+  })
+})
+
+describe('isRepetitionHallucination', () => {
+  it('Given a Japanese result with one leading phrase followed by a looping suffix, When it is checked, Then it is treated as a hallucination', () => {
+    expect(isRepetitionHallucination(`この子供${'の子供'.repeat(80)}`)).toBe(true)
+  })
+
+  it('Given a looping Japanese phrase with a partial final repetition, When it is checked, Then it is still treated as a hallucination', () => {
+    expect(isRepetitionHallucination(`この子供${'の子供'.repeat(80)}の`)).toBe(true)
+  })
+
+  it('Given a short lead-in followed by enough looping Japanese text, When it is checked, Then it is filtered before it grows into a backlog', () => {
+    expect(isRepetitionHallucination(`この子供${'の子供'.repeat(8)}`)).toBe(true)
+  })
+
+  it('Given normal Japanese speech or a short natural repetition, When it is checked, Then it remains translatable', () => {
+    expect(
+      isRepetitionHallucination(
+        'この子供は昨日、公園で遊んでから家に帰りました。週末は新しい本を読んで、家族と夕食を楽しむ予定です。',
+      ),
+    ).toBe(false)
+    expect(isRepetitionHallucination('はいはい、分かりました。')).toBe(false)
   })
 })

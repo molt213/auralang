@@ -3,7 +3,7 @@ import { PrioritizedTranslationQueue } from './latestTranslationQueue'
 import { translateText } from '../services/translationService'
 import { stopSpeech } from '../services/ttsService'
 import { isSilent } from '../utils/audioLevel'
-import { isSilenceHallucination, stripSeamRepeat } from '../utils/text'
+import { isRepetitionHallucination, isSilenceHallucination, stripSeamRepeat } from '../utils/text'
 import type { TranscriptUpdatePayload, TranslationConfig } from '../types'
 
 let lastTranscription = ''
@@ -60,11 +60,11 @@ export async function processAudioChunk(
   const raw = await transcribe(samples, sourceLanguage)
   if (sessionId !== chunkSessionId) return
 
-  // A chunk that is exactly one of Whisper's known silence/noise fillers
-  // ("you", "Thank you", …) is a hallucination, not speech. Drop it WITHOUT
-  // touching lastTranscription — otherwise it slips between two identical
-  // real lines and breaks the consecutive-duplicate check below.
-  if (isSilenceHallucination(raw)) return
+  // Silence/noise fillers and long looping phrases are hallucinations, not
+  // speech. Drop them before a transcript line or translation task is created.
+  // Keep lastTranscription unchanged so a filtered chunk cannot affect the
+  // consecutive-duplicate check for real speech around it.
+  if (isSilenceHallucination(raw) || isRepetitionHallucination(raw)) return
 
   // Chunks are cut mid-stream, so Whisper often re-emits the tail of the
   // previous chunk at the start of this one — drop that seam overlap.

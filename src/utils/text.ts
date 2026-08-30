@@ -14,9 +14,55 @@ const SILENCE_HALLUCINATIONS = new Set([
   'bye',
 ])
 
+const MIN_LOOPING_TEXT_LENGTH = 24
+const MIN_LOOPING_REPETITIONS = 4
+const MAX_LOOPING_UNIT_LENGTH = 48
+const MAX_LOOPING_PREFIX_LENGTH = 48
+const MIN_LOOPING_MATCH_RATIO = 0.95
+
 export function isSilenceHallucination(text: string): boolean {
   const normalized = text.split(/\s+/).filter(Boolean).map(normalizeWord).join(' ')
   return SILENCE_HALLUCINATIONS.has(normalized)
+}
+
+// Some Whisper loops are repeated phrases without word boundaries, especially
+// in Japanese ("この子供この子供…"). Treat only a long, nearly periodic result
+// as a hallucination so ordinary emphasis and short natural repetitions stay.
+export function isRepetitionHallucination(text: string): boolean {
+  const characters = Array.from(normalizeWord(text))
+  if (characters.length < MIN_LOOPING_TEXT_LENGTH) return false
+
+  // Whisper may emit a valid-looking lead-in before entering a loop, such as
+  // "この子供" followed by "の子供" indefinitely. Check a bounded prefix so the
+  // looping part does not need to start at character zero.
+  const maxStart = Math.min(
+    MAX_LOOPING_PREFIX_LENGTH,
+    characters.length - MIN_LOOPING_TEXT_LENGTH,
+  )
+
+  for (let start = 0; start <= maxStart; start++) {
+    const tailLength = characters.length - start
+    const maxUnitLength = Math.min(
+      MAX_LOOPING_UNIT_LENGTH,
+      Math.floor(tailLength / MIN_LOOPING_REPETITIONS),
+    )
+
+    for (let unitLength = 1; unitLength <= maxUnitLength; unitLength++) {
+      let matchingCharacters = 0
+      for (let index = unitLength; index < tailLength; index++) {
+        if (characters[start + index] === characters[start + (index % unitLength)]) {
+          matchingCharacters += 1
+        }
+      }
+
+      const comparableCharacters = tailLength - unitLength
+      if (matchingCharacters / comparableCharacters >= MIN_LOOPING_MATCH_RATIO) {
+        return true
+      }
+    }
+  }
+
+  return false
 }
 
 // Chunks are cut mid-stream, so Whisper often re-emits the tail of the
