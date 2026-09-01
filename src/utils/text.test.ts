@@ -107,6 +107,16 @@ describe('isRepetitionHallucination', () => {
     expect(isRepetitionHallucination(`${leadIn}${'ろ'.repeat(24)}`)).toBe(true)
   })
 
+  it('Given a shorter Japanese phrase loop separated by inconsistent spaces, When it is checked, Then it is still treated as a hallucination', () => {
+    expect(
+      isRepetitionHallucination('いじっていって行くと 行くと行くと 行くと行くと 行くと 行く'),
+    ).toBe(true)
+  })
+
+  it('Given six consecutive repetitions of a short Japanese phrase, When it is checked, Then it is treated as a hallucination', () => {
+    expect(isRepetitionHallucination('行くと'.repeat(6))).toBe(true)
+  })
+
   it('Given normal Japanese speech or a short natural repetition, When it is checked, Then it remains translatable', () => {
     expect(
       isRepetitionHallucination(
@@ -114,5 +124,6 @@ describe('isRepetitionHallucination', () => {
       ),
     ).toBe(false)
     expect(isRepetitionHallucination('はいはい、分かりました。')).toBe(false)
+    expect(isRepetitionHallucination('行くと'.repeat(5))).toBe(false)
   })
 })
