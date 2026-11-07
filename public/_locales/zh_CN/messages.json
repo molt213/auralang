@@ -4,5 +4,20 @@
   },
   "extensionDescription": {
     "message": "实时翻译任意标签页的音频。本地 Whisper 转写，无需 API Key 或账号。"
+  },
+  "floatingWindowToggle": {
+    "message": "浮窗字幕"
+  },
+  "floatingPanelTitle": {
+    "message": "AuraLang"
+  },
+  "floatingPanelMinimize": {
+    "message": "最小化面板"
+  },
+  "floatingPanelExpand": {
+    "message": "展开面板"
+  },
+  "floatingPanelClose": {
+    "message": "关闭面板"
   }
 }

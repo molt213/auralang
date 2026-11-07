@@ -14,7 +14,6 @@ describe('Given older and newer live-caption segments awaiting translation', () 
         translatingLabel="Translating"
         translationFailedLabel="Translation unavailable"
         translationSkippedLabel="Translation stopped"
-        speakingOriginal={null}
       />,
     )
 
@@ -33,12 +32,110 @@ describe('Given older and newer live-caption segments awaiting translation', () 
         translatingLabel="Translating"
         translationFailedLabel="Translation unavailable"
         translationSkippedLabel="Translation stopped"
-        speakingOriginal={null}
       />,
     )
 
     expect(screen.getByText('Translation unavailable')).toBeTruthy()
     expect(screen.getByText('Translation stopped')).toBeTruthy()
     expect(screen.queryByText('Translating')).toBeNull()
+  })
+})
+
+describe('Given a failed LLM request with a provisional translation', () => {
+  it('When the row is rendered, Then it keeps the translation and marks it as failed', () => {
+    render(
+      <TranscriptFeed
+        transcripts={[
+          {
+            segmentId: 1,
+            original: 'まだ話している途中です',
+            translated: '还在说',
+            translationStatus: 'failed',
+          },
+        ]}
+        translatingLabel="Translating"
+        translationFailedLabel="Translation unavailable"
+        translationSkippedLabel="Translation stopped"
+      />,
+    )
+
+    expect(screen.getByText('还在说')).toBeTruthy()
+    expect(screen.getByLabelText('Translation unavailable')).toBeTruthy()
+  })
+})
+
+describe('Given a translation that is still streaming in', () => {
+  it('When a partial translation arrives, Then the row grows with the text instead of showing the loading label', () => {
+    render(
+      <TranscriptFeed
+        transcripts={[
+          { segmentId: 1, original: 'Hello world', translated: '你好', translationStatus: 'partial' },
+        ]}
+        translatingLabel="Translating"
+        translationFailedLabel="Translation unavailable"
+        translationSkippedLabel="Translation stopped"
+      />,
+    )
+
+    const row = screen.getByText('Hello world').parentElement
+    expect(row?.textContent).toContain('你好')
+    expect(screen.queryByText('Translating')).toBeNull()
+  })
+})
+
+describe('Given speech that has not settled yet', () => {
+  it('When a preview row is shown, Then it reads as provisional instead of as a final translation', () => {
+    render(
+      <TranscriptFeed
+        transcripts={[
+          { segmentId: 1, original: 'まだ話している', translated: '还在说', translationStatus: 'preview' },
+        ]}
+        translatingLabel="Translating"
+        translationFailedLabel="Translation unavailable"
+        translationSkippedLabel="Translation stopped"
+      />,
+    )
+
+    const row = screen.getByText('まだ話している').parentElement
+    expect(row?.textContent).toContain('还在说')
+    expect(screen.queryByText('Translating')).toBeNull()
+  })
+
+  it('When the settled caption still carries the preview translation, Then the row keeps showing it', () => {
+    render(
+      <TranscriptFeed
+        transcripts={[
+          {
+            segmentId: 1,
+            original: 'まだ話している途中です',
+            translated: '还在说',
+            translationStatus: 'pending',
+          },
+        ]}
+        translatingLabel="Translating"
+        translationFailedLabel="Translation unavailable"
+        translationSkippedLabel="Translation stopped"
+      />,
+    )
+
+    const row = screen.getByText('まだ話している途中です').parentElement
+    expect(row?.textContent).toContain('还在说')
+    expect(screen.queryByText('Translating')).toBeNull()
+  })
+
+  it('When a preview has no translation yet, Then the row does not repeat the original as if it were one', () => {
+    render(
+      <TranscriptFeed
+        transcripts={[
+          { segmentId: 1, original: 'まだ話している', translated: null, translationStatus: 'preview' },
+        ]}
+        translatingLabel="Translating"
+        translationFailedLabel="Translation unavailable"
+        translationSkippedLabel="Translation stopped"
+      />,
+    )
+
+    const row = screen.getByText('まだ話している').parentElement
+    expect(row?.textContent).toBe('まだ話している···')
   })
 })

@@ -12,6 +12,9 @@ interface StatusCircleProps {
   // Show a bar even without a real percentage (probing, or a cache hit that
   // would otherwise stick at 100%) — falls back to an indeterminate animation.
   loading?: boolean
+  // The floating panel is narrower and shorter than the old side panel, so the
+  // idle state uses a smaller version of the same indicator.
+  compact?: boolean
 }
 
 // Single status indicator for both the idle and the active screens. Keeping
@@ -24,6 +27,7 @@ export function StatusCircle({
   glow = 'none',
   progress = null,
   loading = false,
+  compact = false,
 }: StatusCircleProps) {
   const clampedProgress = progress === null ? null : Math.max(0, Math.min(100, progress))
   // Only fill a determinate bar for genuine mid-download progress; at 0/100/null
@@ -39,17 +43,31 @@ export function StatusCircle({
         : 'border-brand-purple/50 glow-purple'
 
   return (
-    <div className="flex flex-col items-center gap-3 py-4 text-center">
+    <div
+      className={
+        compact
+          ? 'flex flex-col items-center gap-2 py-1 text-center'
+          : 'flex flex-col items-center gap-3 py-4 text-center'
+      }
+    >
       <div
-        className={`relative flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-2 bg-[var(--surface-elevated)] ${circleClass}`}
+        className={`relative flex shrink-0 items-center justify-center rounded-full border-2 bg-[var(--surface-elevated)] ${
+          compact ? 'h-16 w-16' : 'h-24 w-24'
+        } ${circleClass}`}
       >
-        <WaveformBars animated={animated} />
+        <WaveformBars animated={animated} className={compact ? 'scale-[0.7]' : ''} />
       </div>
       <div className="flex w-full flex-col items-center gap-1">
-        <h2 className="text-h2 font-semibold text-[var(--text-primary)]">{title}</h2>
-        <p className="max-w-[260px] text-body text-muted">{subtitle}</p>
+        <h2
+          className={`font-semibold text-[var(--text-primary)] ${compact ? 'text-body' : 'text-h2'}`}
+        >
+          {title}
+        </h2>
+        <p className={compact ? 'max-w-[280px] text-caption text-muted' : 'max-w-[260px] text-body text-muted'}>
+          {subtitle}
+        </p>
         {showBar && (
-          <div className="mt-2 flex w-52 max-w-full items-center gap-2">
+          <div className={`mt-2 flex max-w-full items-center gap-2 ${compact ? 'w-40' : 'w-52'}`}>
             <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--border-color)]">
               {determinate ? (
                 <div

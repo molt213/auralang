@@ -5,8 +5,10 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "dev": "npm run prepare-wasm && vite",
+    "build": "npm run prepare-wasm && tsc && vite build",
+    "prepare-wasm": "node scripts/prepare-sherpa-wasm.mjs",
+    "smoke:dolphin": "node scripts/dolphin-smoke-test.mjs",
     "preview": "vite preview",
     "lint": "eslint .",
     "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand",

@@ -3,12 +3,13 @@ interface VolumeSliderProps {
   // 0 (muted) to 1 (full).
   value: number
   onChange: (value: number) => void
+  compact?: boolean
 }
 
-export function VolumeSlider({ label, value, onChange }: VolumeSliderProps) {
+export function VolumeSlider({ label, value, onChange, compact = false }: VolumeSliderProps) {
   const percent = Math.round(value * 100)
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className={`flex flex-col ${compact ? 'gap-0.5' : 'gap-1.5'}`}>
       <div className="flex items-center justify-between">
         <span className="text-caption font-medium text-muted">{label}</span>
         <span className="text-caption tabular-nums text-muted">{percent}%</span>

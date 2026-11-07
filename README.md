@@ -7,7 +7,7 @@
 
 <p align="center">
   <strong>Real-time audio translation for any browser tab.</strong><br>
-  Transcribes locally with Whisper, translates, and reads it back aloud — free by default, with optional external AI APIs.
+  Transcribes locally with Whisper or Dolphin, translates, and shows live captions — free by default, with optional external AI APIs.
 </p>
 
 <p align="center">
@@ -33,30 +33,34 @@ Prefer to run it from source? See [Run it locally](#-run-it-locally).
 
 ## ✨ What it does
 
-Watching a talk, a podcast, or a video in a language you don't speak? AuraLang listens to the tab, translates on the fly, and speaks the result — so you can **watch the screen instead of reading subtitles**.
+Watching a talk, a podcast, or a video in a language you don't speak? AuraLang listens to the tab, translates on the fly, and shows the result as live captions — in a floating panel and on top of the video.
 
 - 🎧 **Any tab with audio** — videos, calls, podcasts, live streams.
 - 🧠 **On-device transcription** — Whisper runs locally; audio never leaves your machine.
-- 🗣️ **Spoken translation** — the original tab audio is muted; you only hear the translation.
-- 📊 **Live transcript with karaoke** — read the original + translation in a side panel; the line being spoken is highlighted.
+- 🔊 **Original audio kept** — Chrome mutes a captured tab; AuraLang replays the original at a level you control (defaults to a quiet background, adjustable live up to full volume).
+- 📊 **Live transcript** — read the original + translation in a draggable floating panel that never shrinks the page.
 - 🎬 **On-video subtitles** — the latest original and translation appear at the bottom of the active video.
-- 🎚️ **Model modes** — Auto / Light (whisper-tiny) / Balanced (whisper-base): trade speed for accuracy per your device.
-- 🔒 **Free by default** — Google Translate needs no key; an external OpenAI-compatible API is optional.
+- 🪟 **Always-on-top captions** — click the button on the video to pop the captions into a floating window you can drag anywhere, even over other apps.
+- ⚡ **Captions that keep up** — a provisional translation appears while the speaker is still talking, then the AI-model translation streams in and replaces it without blanking the line.
+- 🎚️ **Model modes** — Auto / Light (whisper-tiny) / Balanced (whisper-base) / Dolphin (Japanese-optimized CTC): trade speed for accuracy per your device.
+- 🔒 **Free by default** — Google, MyMemory, or Bilibili's Index-Translate need no key; Baidu's free monthly quota and external OpenAI-compatible APIs are optional.
 - 🌗 **Light & dark themes**, interface in **English, Spanish, and Simplified Chinese**.
 
 ## ⚙️ How it works
 
 ```
-Tab audio ─▶ Whisper (local transcription) ─▶ Google Translate or your external API ─▶ Web Speech API (spoken output)
+Tab audio ─▶ Whisper / Dolphin (local transcription) ─▶ Google / MyMemory / Baidu / Index-Translate / external API ─▶ live captions (floating panel + on-video subtitles + always-on-top window)
 ```
 
-Audio is buffered and cut on natural speech pauses, transcribed on-device, translated, and read aloud through the browser's built-in voice. The original tab audio is muted while capturing.
+Audio is buffered and cut on natural speech pauses, transcribed on-device, translated, and shown as live captions. Chrome mutes a captured tab, so the original audio is replayed by the extension at a level you choose (defaults to a quiet background).
 
 ## 🔌 Use an external AI API
 
-The default **Google free** translation service does not require a key. To use an AI model instead, open **Settings** and choose **External API**. AuraLang accepts the OpenAI chat-completions format, so it works with OpenAI and compatible providers such as DeepSeek, Groq, OpenRouter, SiliconFlow, or a local Ollama server.
+The free **Google** and **MyMemory** translation services do not require a key; if Google is unreachable on your network, pick MyMemory in Settings. **Baidu** works with a Baidu Translate App ID and secret key (free monthly quota after identity verification). **Bilibili Index-Translate** is built in as a keyless free preset of Bilibili's public OpenAI-compatible endpoint; pick 35B-A3B for quality or 9B/2B for speed. Bilibili's WAF rejects requests whose `Origin` is a `chrome-extension://` URL, so a `declarativeNetRequest` rule removes that header for `index-translate.bilibili.com` only. To use another AI model, choose **External API**. AuraLang accepts the OpenAI chat-completions format, so it works with OpenAI and compatible providers such as DeepSeek, Groq, OpenRouter, SiliconFlow, or a local Ollama server.
 
 Enter the provider's API base URL, model name, and API key. AuraLang appends `/chat/completions` when necessary. When you start translation for the first time with a new API host, Chrome asks for permission to contact that host; declining the request keeps translation stopped.
+
+AuraLang can also split the two translation roles. Choose a free service (Google, MyMemory, or Baidu) as the main provider for **provisional captions**, then enable **Final translation** and pick either the built-in Index-Translate preset or your own OpenAI-compatible endpoint. The fast service fills the line while the speaker is still talking; when the utterance settles, the final translation streams from the chosen model. If the free service is unreachable, the provisional line is skipped but the final translation still arrives. With final translation disabled, the main provider handles both stages.
 
 Examples:
 
@@ -82,10 +86,9 @@ Then in Chrome:
 1. Open `chrome://extensions`
 2. Enable **Developer mode** (top-right)
 3. Click **Load unpacked** → select the `dist/` folder
-4. On the tab you want to translate, click the AuraLang icon to open the **side panel**
+4. On the tab you want to translate, click the AuraLang icon to open the **floating panel**
 5. Pick source & target languages, then hit **Start translation**
-
-> The Whisper model downloads on first Start and is cached afterwards. Size depends on the model mode: Light ~150 MB, Balanced ~290 MB. Auto picks one from your device.
+> The Whisper/Dolphin model downloads on first Start and is cached afterwards. Size depends on the model mode: Light ~150 MB, Balanced ~290 MB, Dolphin ~250 MB. Auto picks a Whisper tier from your device.
 
 ## 🛠️ Development
 
@@ -101,27 +104,31 @@ npm run zip         # Build + package dist.zip for the Web Store
 
 | Layer | Tool |
 |---|---|
-| Extension API | Chrome MV3 — `tabCapture`, `offscreen`, `scripting`, `sidePanel`, `storage` |
+| Extension API | Chrome MV3 — `tabCapture`, `offscreen`, `scripting`, `storage` |
 | Build | Vite + `@crxjs/vite-plugin` |
 | UI | React 18 + TypeScript (strict) |
 | Styles | Tailwind CSS |
-| Transcription | Whisper via `@huggingface/transformers` (local, offscreen document) |
-| Translation | Google Translate (free, default) or a user-configured OpenAI-compatible API |
-| Speech | Web Speech API (`speechSynthesis`) |
+| Transcription | Whisper via `@huggingface/transformers` (local, offscreen document) or the Dolphin CTC model via the sherpa-onnx WASM runtime (Japanese-optimized) |
+| Translation | Google Translate (free, default), MyMemory, Baidu, Bilibili Index-Translate (free, built in), or a user-configured OpenAI-compatible API |
 
 ## 📁 Project structure
 
 ```
 src/
-  asr/          # Model tiers/registry, model manager (probe ladder), inference queue
-  background/   # Service worker — tabCapture + offscreen + side panel lifecycle
-  offscreen/    # AudioContext + transcription / translation / TTS pipeline
-  popup/        # React UI (rendered in the side panel)
-    components/ # Header, StatusHero, WaveformIndicator, LanguageSelect, SettingsPanel, TranscriptFeed…
+  asr/          # Model tiers/registry, model manager (probe ladder), inference queue, Dolphin engine client
+  background/   # Service worker — tabCapture, offscreen lifecycle, panel injection
+  content/      # Injected page overlay, floating control panel, always-on-top captions
+  offscreen/    # AudioContext + transcription / translation pipeline
+  popup/        # React UI (rendered inside the floating panel iframe)
+    components/ # Header, StatusCircle/StatusStrip, LanguageSelect, SettingsPanel, TranscriptFeed…
     hooks/      # useApiConfig, useTranslation, useI18n, useTheme
   welcome/      # First-install onboarding page
-  services/     # transcriptionService, translationService, ttsService
+  services/     # transcriptionService, translationService
   types/        # Shared TypeScript interfaces
+public/
+  workers/      # Dolphin classic worker (sherpa-onnx WASM runtime)
+  wasm/         # Staged sherpa-onnx runtime (built by scripts/prepare-sherpa-wasm.mjs from vendor/)
+vendor/         # Pristine sherpa-onnx WASM runtime + Apache-2.0 LICENSE
 ```
 
 ## 🔐 Privacy
@@ -131,6 +138,7 @@ No backend, no telemetry, no account. Transcription happens on your device; the 
 ## 📚 Docs
 
 - [AGENTS.md](./AGENTS.md) — architecture, TypeScript, services, testing & accessibility conventions (source of truth for contributors).
+- [docs/DOLPHIN_ENGINE.md](./docs/DOLPHIN_ENGINE.md) — the optional Dolphin (Japanese) ASR engine: layout, runtime quirks, verification.
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — setup, branching, commit conventions.
 - [PRIVACY.md](./PRIVACY.md) — privacy policy.
 - [DISCLAIMER.md](./DISCLAIMER.md) — accuracy limitations, third-party services, no affiliation.

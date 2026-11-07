@@ -11,7 +11,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        // Loaded at runtime via chrome.sidePanel.setOptions, so it's not
+        // Loaded by the injected floating panel iframe, so it is not
         // referenced by the manifest and crxjs won't bundle it on its own.
         panel: 'src/popup/index.html',
         offscreen: 'src/offscreen/index.html',

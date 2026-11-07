@@ -5,9 +5,8 @@ import type {
   TranslationState,
   UserConfig,
 } from '../../types'
-import { speak, stopSpeech, onSpeakingChange } from '../../services/ttsService'
 import { externalApiPermissionOrigin } from '../../services/translationService'
-import { shouldSpeakTranslation, upsertTranscriptUpdate } from './transcriptUpdates'
+import { upsertTranscriptUpdate } from './transcriptUpdates'
 
 export interface UseTranslationReturn {
   state: TranslationState
@@ -15,7 +14,10 @@ export interface UseTranslationReturn {
 }
 
 export function useTranslation(
-  config: Pick<UserConfig, 'targetLanguage' | 'sourceLanguage' | 'asrMode' | 'voiceVolume' | 'originalVolume' | 'translation'>,
+  config: Pick<
+    UserConfig,
+    'targetLanguage' | 'sourceLanguage' | 'asrMode' | 'originalVolume' | 'translation' | 'finalTranslation'
+  >,
 ): UseTranslationReturn {
   const [state, setState] = useState<TranslationState>({
     isActive: false,
@@ -24,30 +26,19 @@ export function useTranslation(
     error: null,
     transcripts: [],
     modelStatus: null,
-    speakingOriginal: null,
   })
 
-  // The translation voice runs HERE in the side panel, not in the offscreen
-  // document: Chrome throttles speechSynthesis in offscreen docs, so the voice
-  // was unreliable/silent. The panel is a focused document with real audio.
-  const targetLangRef = useRef(config.targetLanguage)
-  const voiceVolumeRef = useRef(config.voiceVolume)
-  const latestSegmentIdRef = useRef(0)
-  const currentCaptureKnownRef = useRef(false)
   const captureStateVersionRef = useRef(0)
 
+  // The original audio is replayed by the offscreen document (Chrome mutes a
+  // captured tab), so a slider change must be forwarded while capture runs.
   useEffect(() => {
-    targetLangRef.current = config.targetLanguage
-  }, [config.targetLanguage])
-
-  useEffect(() => {
-    voiceVolumeRef.current = config.voiceVolume
-  }, [config.voiceVolume])
-
-  // Silence the current utterance immediately when the voice is muted.
-  useEffect(() => {
-    if (config.voiceVolume === 0) stopSpeech()
-  }, [config.voiceVolume])
+    if (!state.isActive) return
+    void Promise.resolve(chrome.runtime.sendMessage<ExtensionMessage>({
+      type: 'SET_ORIGINAL_VOLUME',
+      payload: { volume: config.originalVolume },
+    })).catch(() => undefined)
+  }, [config.originalVolume, state.isActive])
 
   useEffect(() => {
     const requestedCaptureStateVersion = captureStateVersionRef.current
@@ -60,8 +51,6 @@ export function useTranslation(
         ) {
           return
         }
-        latestSegmentIdRef.current = Math.max(latestSegmentIdRef.current, response?.latestSegmentId ?? 0)
-        currentCaptureKnownRef.current = response?.active === true
         if (response?.active) {
           setState((prev) => ({ ...prev, isActive: true }))
         }
@@ -97,9 +86,7 @@ export function useTranslation(
         setState((prev) => ({ ...prev, error: payload.message }))
       }
       if (message.type === 'CAPTURE_ENDED') {
-        stopSpeech()
         captureStateVersionRef.current += 1
-        currentCaptureKnownRef.current = false
         setState((prev) => ({
           ...prev,
           isActive: false,
@@ -109,21 +96,6 @@ export function useTranslation(
       }
       if (message.type === 'TRANSCRIPT_UPDATE') {
         const payload = message.payload
-        latestSegmentIdRef.current = Math.max(latestSegmentIdRef.current, payload.segmentId)
-        // Speak the translation here in the panel (reliable audio). The chunk
-        // arrives twice; the first emit has translated === null, so this only
-        // fires once the translation is in. Backfilled older lines stay silent
-        // so concurrent requests cannot make speech play out of order.
-        if (
-          shouldSpeakTranslation(
-            payload,
-            latestSegmentIdRef.current,
-            currentCaptureKnownRef.current,
-          )
-          && voiceVolumeRef.current > 0
-        ) {
-          speak(payload.translated, targetLangRef.current, payload.original, voiceVolumeRef.current)
-        }
         setState((prev) => {
           return { ...prev, transcripts: upsertTranscriptUpdate(prev.transcripts, payload) }
         })
@@ -131,48 +103,95 @@ export function useTranslation(
     }
     chrome.runtime.onMessage.addListener(handler)
 
-    // Karaoke highlight is driven locally now that speaking happens in the panel.
-    onSpeakingChange((original) => {
-      setState((prev) => ({ ...prev, speakingOriginal: original }))
-    })
-
     return () => {
       chrome.runtime.onMessage.removeListener(handler)
-      stopSpeech()
     }
   }, [])
 
   const toggle = useCallback(async () => {
     const starting = !state.isActive
-    if (starting && config.translation.provider === 'openai-compatible') {
-      try {
-        const origin = externalApiPermissionOrigin(config.translation)
-        const granted = await chrome.permissions.request({ origins: [origin] })
-        if (!granted) {
-          throw new Error('externalApiPermissionDenied')
+    if (starting) {
+      const provider = config.translation.provider
+      const mainHandlesFinal =
+        provider === 'openai-compatible' || provider === 'index-translate'
+      const finalExternalEnabled =
+        config.finalTranslation.enabled && !mainHandlesFinal
+      const origins: string[] = []
+
+      if (mainHandlesFinal) {
+        try {
+          origins.push(externalApiPermissionOrigin(config.translation))
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'externalApiSetupFailed'
+          setState((prev) => ({ ...prev, error: message }))
+          return
         }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'externalApiSetupFailed'
-        setState((prev) => ({ ...prev, error: message }))
-        return
+      } else if (!finalExternalEnabled) {
+        // The main service only fills provisional captions when a final API is
+        // configured. Its host is in host_permissions; never let a missing
+        // preview grant block the LLM path.
+        if (provider === 'baidu') {
+          origins.push('https://fanyi-api.baidu.com/*')
+        } else if (provider === 'mymemory') {
+          origins.push('https://api.mymemory.translated.net/*')
+        }
+      }
+
+      if (finalExternalEnabled) {
+        try {
+          origins.push(externalApiPermissionOrigin({
+            provider: config.finalTranslation.provider,
+            baseUrl: config.finalTranslation.baseUrl,
+            model: config.finalTranslation.model,
+            apiKey: config.finalTranslation.apiKey,
+            appId: '',
+          }))
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'externalApiSetupFailed'
+          setState((prev) => ({ ...prev, error: message }))
+          return
+        }
+      }
+
+      // Ask for the service hosts explicitly: a rebuilt extension can still be
+      // running an older manifest whose host_permissions do not include them,
+      // and a cross-origin request without that grant fails as a CORS error.
+      if (origins.length > 0) {
+        try {
+          const granted = await chrome.permissions.request({ origins })
+          if (!granted) {
+            setState((prev) => ({
+              ...prev,
+              error: mainHandlesFinal || finalExternalEnabled
+                ? 'externalApiPermissionDenied'
+                : 'translationPermissionDenied',
+            }))
+            return
+          }
+        } catch (error) {
+          // A host already granted through host_permissions may not be
+          // requestable. Embedded extension pages can also refuse the prompt;
+          // in both cases an existing grant is enough to continue.
+          const alreadyGranted = await chrome.permissions
+            .contains({ origins })
+            .catch(() => false)
+          if (!alreadyGranted) {
+            const message = error instanceof Error ? error.message : 'externalApiSetupFailed'
+            setState((prev) => ({ ...prev, error: message }))
+            return
+          }
+        }
       }
     }
 
     captureStateVersionRef.current += 1
-    if (starting) {
-      latestSegmentIdRef.current = 0
-      currentCaptureKnownRef.current = false
-    } else {
-      currentCaptureKnownRef.current = false
-    }
-    stopSpeech() // cut any queued/current utterance on both start and stop
     // Clear the transcript only when starting a new session — keep it visible
     // after Stop so the user can still read what was said.
     setState((prev) => ({
       ...prev,
       isLoading: true,
       error: null,
-      ...(starting ? { transcripts: [], speakingOriginal: null } : {}),
+      ...(starting ? { transcripts: [] } : {}),
     }))
 
     const message: ExtensionMessage = state.isActive
@@ -185,6 +204,7 @@ export function useTranslation(
             asrMode: config.asrMode,
             originalVolume: config.originalVolume,
             translation: config.translation,
+            finalTranslation: config.finalTranslation,
           },
         }
 
@@ -192,7 +212,6 @@ export function useTranslation(
       message,
       (response: { success: boolean; error?: string }) => {
         if (chrome.runtime.lastError || !response?.success) {
-          if (starting) currentCaptureKnownRef.current = false
           setState((prev) => ({
             ...prev,
             isLoading: false,
@@ -200,7 +219,6 @@ export function useTranslation(
           }))
           return
         }
-        if (starting) currentCaptureKnownRef.current = true
         setState((prev) => ({
           ...prev,
           isActive: !prev.isActive,
@@ -208,7 +226,7 @@ export function useTranslation(
         }))
       },
     )
-  }, [state.isActive, config.targetLanguage, config.sourceLanguage, config.asrMode, config.originalVolume, config.translation])
+  }, [state.isActive, config.targetLanguage, config.sourceLanguage, config.asrMode, config.originalVolume, config.translation, config.finalTranslation])
 
   return { state, toggle }
 }

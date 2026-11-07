@@ -1,7 +1,8 @@
 // ASR runs inside a dedicated Web Worker. Whisper inference is single-thread
-// WASM and Chrome hosts every extension page (side panel + offscreen) on ONE
-// shared main thread — running inference there froze the panel UI for seconds
-// per chunk (lost clicks, unresponsive menu). A worker gets its own thread.
+// WASM and Chrome hosts every extension page (the panel and the offscreen
+// document) on ONE shared main thread — running inference there froze the panel
+// UI for seconds per chunk (lost clicks, unresponsive menu). A worker gets its
+// own thread.
 import { setModelTier, onModelStatus } from '../asr/modelManager'
 import { tierForMode } from '../asr/registry'
 import { transcribeAudio } from '../services/transcriptionService'
@@ -31,7 +32,11 @@ self.onmessage = async (event: MessageEvent<AsrWorkerRequest>) => {
   const msg = event.data
 
   if (msg.type === 'SET_TIER' && msg.mode) {
-    setModelTier(tierForMode(msg.mode))
+    const tier = tierForMode(msg.mode)
+    // The Dolphin tier runs on the sherpa-onnx runtime in its own worker;
+    // asrClient routes those sessions and never forwards them here.
+    if (tier.engine !== 'transformers') return
+    setModelTier(tier)
     return
   }
 

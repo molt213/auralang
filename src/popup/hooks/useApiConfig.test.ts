@@ -66,8 +66,83 @@ describe('Given the saved AuraLang configuration', () => {
         model: '',
         apiKey: '',
       },
+      finalTranslation: {
+        enabled: false,
+        provider: 'openai-compatible',
+        baseUrl: '',
+        model: '',
+        apiKey: '',
+      },
     })
     expect(setMock).not.toHaveBeenCalled()
+  })
+
+  it('When a final external API was saved, Then it restores that configuration', async () => {
+    getMock.mockImplementationOnce((_key, callback) => {
+      callback({
+        auralang_config: {
+          targetLanguage: 'fr',
+          sourceLanguage: 'en',
+          uiLanguage: 'en',
+          uiTheme: 'dark',
+          finalTranslation: {
+            enabled: true,
+            baseUrl: 'https://api.example.com/v1',
+            model: 'example-model',
+            apiKey: '',
+          },
+        },
+      })
+    })
+
+    const { result } = renderHook(() => useApiConfig())
+
+    await waitFor(() => expect(result.current.isLoaded).toBe(true))
+
+    expect(result.current.config.finalTranslation).toEqual({
+      enabled: true,
+      provider: 'openai-compatible',
+      baseUrl: 'https://api.example.com/v1',
+      model: 'example-model',
+      apiKey: '',
+    })
+  })
+
+  it('When the built-in Index-Translate service was saved as the final translator, Then it restores that choice', async () => {
+    getMock.mockImplementationOnce((_key, callback) => {
+      callback({
+        auralang_config: {
+          targetLanguage: 'fr',
+          sourceLanguage: 'en',
+          translation: {
+            provider: 'index-translate',
+            baseUrl: '',
+            model: 'Index-Translate-9B',
+            apiKey: '',
+            appId: '',
+          },
+          finalTranslation: {
+            enabled: true,
+            provider: 'index-translate',
+            baseUrl: '',
+            model: 'Index-Translate-2B',
+            apiKey: '',
+          },
+        },
+      })
+    })
+
+    const { result } = renderHook(() => useApiConfig())
+
+    await waitFor(() => expect(result.current.isLoaded).toBe(true))
+
+    expect(result.current.config.translation.provider).toBe('index-translate')
+    expect(result.current.config.translation.model).toBe('Index-Translate-9B')
+    expect(result.current.config.finalTranslation).toMatchObject({
+      enabled: true,
+      provider: 'index-translate',
+      model: 'Index-Translate-2B',
+    })
   })
 
   it('When the saved interface language is Simplified Chinese, Then it restores that preference', async () => {

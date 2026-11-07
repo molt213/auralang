@@ -7,6 +7,8 @@ interface PrimaryButtonProps {
   disabled?: boolean
   variant?: 'primary' | 'ghost'
   type?: 'button' | 'submit'
+  compact?: boolean
+  fullWidth?: boolean
 }
 
 export function PrimaryButton({
@@ -16,9 +18,12 @@ export function PrimaryButton({
   disabled,
   variant = 'primary',
   type = 'button',
+  compact = false,
+  fullWidth = true,
 }: PrimaryButtonProps) {
-  const base =
-    'w-full flex items-center justify-center gap-2.5 text-body font-semibold py-3.5 rounded-xl transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed'
+  const base = `flex items-center justify-center gap-2.5 font-semibold rounded-xl transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+    fullWidth ? 'w-full' : ''
+  } ${compact ? 'px-4 py-2.5 text-caption' : 'py-3.5 text-body'}`
 
   const variantClass =
     variant === 'ghost'

@@ -10,6 +10,7 @@ import { useStatusToasts } from './hooks/useStatusToasts'
 import { useActiveStatus } from './hooks/useActiveStatus'
 import { Header } from './components/Header'
 import { StatusCircle } from './components/StatusCircle'
+import { StatusStrip } from './components/StatusStrip'
 import { LanguageSelect } from './components/LanguageSelect'
 import { PrimaryButton } from './components/PrimaryButton'
 import { Footer } from './components/Footer'
@@ -17,7 +18,7 @@ import { SettingsPanel } from './components/SettingsPanel'
 import { VolumeSlider } from './components/VolumeSlider'
 import { TranscriptFeed } from './components/TranscriptFeed'
 import { PlayIcon, StopIcon } from './components/Icons'
-import type { TranslationConfig, UiLanguage, UiTheme } from '../types'
+import type { FinalTranslationConfig, TranslationConfig, UiLanguage, UiTheme } from '../types'
 import type { AsrMode } from '../asr/types'
 import { tierForMode } from '../asr/registry'
 
@@ -68,7 +69,7 @@ export default function App() {
         containerStyle={{ top: 16 }}
         toastOptions={{
           style: {
-            maxWidth: '288px',
+            maxWidth: '300px',
             background: 'var(--surface-elevated)',
             color: 'var(--text-primary)',
             border: '1px solid rgba(239, 68, 68, 0.3)',
@@ -87,15 +88,18 @@ export default function App() {
         }}
       />
 
-      <div className="popup-shell relative flex h-screen w-full flex-col overflow-x-hidden p-5">
-        <Header
-          tagline={t('tagline')}
-          settingsAriaLabel={t('settings.openAriaLabel')}
-          onOpenSettings={() => {
-            setOpenSelect(null)
-            setSettingsOpen(true)
-          }}
-        />
+      <div className="panel-shell relative flex h-screen w-full flex-col overflow-hidden bg-[var(--panel-bg)]">
+        <div className={translation.isActive ? 'px-3 pb-0 pt-2' : 'px-4 pb-1 pt-3'}>
+          <Header
+            tagline={t('tagline')}
+            compact={translation.isActive}
+            settingsAriaLabel={t('settings.openAriaLabel')}
+            onOpenSettings={() => {
+              setOpenSelect(null)
+              setSettingsOpen(true)
+            }}
+          />
+        </div>
 
         <SettingsPanel
           isOpen={settingsOpen}
@@ -105,6 +109,7 @@ export default function App() {
           asrMode={config.asrMode}
           asrModeLocked={translation.isActive}
           translation={config.translation}
+          finalTranslation={config.finalTranslation}
           translationLocked={translation.isActive}
           autoResolvedNote={autoResolvedNote}
           backdropCloseAriaLabel={t('settings.backdropAriaLabel')}
@@ -115,118 +120,138 @@ export default function App() {
           onTranslationChange={<K extends keyof TranslationConfig>(key: K, value: TranslationConfig[K]) => {
             updateField('translation', { ...config.translation, [key]: value })
           }}
+          onFinalTranslationChange={<K extends keyof FinalTranslationConfig>(key: K, value: FinalTranslationConfig[K]) => {
+            updateField('finalTranslation', { ...config.finalTranslation, [key]: value })
+          }}
           t={t}
         />
 
-        <div className="flex min-h-0 flex-1 flex-col gap-4 pt-4">
-          {/* Content zone — swaps between idle and active, but stays the same
-              flex-1 region. Top-aligned in BOTH states so the status circle
-              keeps the same position and never jumps when translation starts. */}
-          <div className="flex min-h-0 flex-1 flex-col gap-4">
-            {!translation.isActive ? (
-              <>
-                <StatusCircle
-                  title={t('readyToTranslate')}
-                  subtitle={t('readyDescription')}
-                  animated={false}
-                  glow="none"
+        <main
+          className={`flex min-h-0 flex-1 flex-col ${
+            translation.isActive ? 'gap-2 px-3 pb-1.5 pt-2' : 'gap-3 px-4 pb-2 pt-3'
+          }`}
+        >
+          {!translation.isActive ? (
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-0.5">
+              <StatusCircle
+                title={t('readyToTranslate')}
+                subtitle={t('readyDescription')}
+                animated={false}
+                glow="none"
+                compact
+              />
+              <div className="flex flex-col gap-2.5">
+                <LanguageSelect
+                  label={t('sourceLanguage')}
+                  value={config.sourceLanguage}
+                  uiLanguage={config.uiLanguage}
+                  searchPlaceholder={t('searchLanguage')}
+                  noResultsText={t('noResults')}
+                  disabled={translation.isActive}
+                  isOpen={openSelect === 'source'}
+                  onOpenChange={(open) => setOpenSelect(open ? 'source' : null)}
+                  onChange={(value) => updateField('sourceLanguage', value)}
+                  placement="bottom"
+                  compact
                 />
-                <p className="text-center text-caption text-muted">{modelNote}</p>
-                {/* Keep the last session's transcript visible after Stop. */}
-                {translation.transcripts.length > 0 && (
-                  <TranscriptFeed
-                    transcripts={translation.transcripts}
-                    translatingLabel={t('translating')}
-                    translationFailedLabel={t('translationFailed')}
-                    translationSkippedLabel={t('translationSkipped')}
-                    speakingOriginal={translation.speakingOriginal}
-                  />
-                )}
-              </>
-            ) : (
-              <>
-                <StatusCircle
-                  title={activeStatus.title}
-                  subtitle={activeStatus.subtitle}
-                  progress={activeStatus.progress}
-                  loading={activeStatus.loading}
-                  animated
-                  glow="intense"
+                <LanguageSelect
+                  label={t('targetLanguage')}
+                  value={config.targetLanguage}
+                  uiLanguage={config.uiLanguage}
+                  searchPlaceholder={t('searchLanguage')}
+                  noResultsText={t('noResults')}
+                  disabled={translation.isActive}
+                  isOpen={openSelect === 'target'}
+                  onOpenChange={(open) => setOpenSelect(open ? 'target' : null)}
+                  onChange={(value) => updateField('targetLanguage', value)}
+                  placement="bottom"
+                  compact
                 />
-                {/* Only draw the bordered transcript box once there are lines
-                    to show. Before that: nothing while the model loads, and a
-                    calm centered hint (no empty container) once we're listening,
-                    so the waiting space reads as intentional, not unfinished. */}
+              </div>
+              <PrimaryButton
+                icon={<PlayIcon />}
+                onClick={toggle}
+                disabled={translation.isLoading}
+              >
+                {translation.isLoading ? t('connecting') : t('startTranslation')}
+              </PrimaryButton>
+              <VolumeSlider
+                label={t('originalVolume')}
+                value={config.originalVolume}
+                onChange={(value) => updateField('originalVolume', value)}
+                compact
+              />
+              <p className="text-center text-caption text-muted">{modelNote}</p>
+              {translation.transcripts.length > 0 && (
+                <TranscriptFeed
+                  transcripts={translation.transcripts}
+                  translatingLabel={t('translating')}
+                  translationFailedLabel={t('translationFailed')}
+                  translationSkippedLabel={t('translationSkipped')}
+                  className="max-h-52"
+                />
+              )}
+            </div>
+          ) : (
+            <>
+              <StatusStrip
+                title={activeStatus.title}
+                subtitle={activeStatus.subtitle}
+                progress={activeStatus.progress}
+                loading={activeStatus.loading}
+              />
+
+              <div className="flex min-h-0 flex-1 flex-col">
                 {translation.transcripts.length > 0 ? (
                   <TranscriptFeed
                     transcripts={translation.transcripts}
                     translatingLabel={t('translating')}
                     translationFailedLabel={t('translationFailed')}
                     translationSkippedLabel={t('translationSkipped')}
-                    speakingOriginal={translation.speakingOriginal}
                   />
                 ) : (
                   translation.isModelReady && (
-                    <div className="flex flex-1 items-center justify-center px-6 text-center">
-                      <p className="text-body text-muted">{t('playToStart')}</p>
+                    <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 text-center">
+                      <p className="text-body font-medium text-muted">{t('waitingForSpeech')}</p>
+                      <p className="text-caption leading-snug text-muted">
+                        {t('waitingForSpeechHint')}
+                      </p>
                     </div>
                   )
                 )}
-              </>
-            )}
-          </div>
+              </div>
 
-          {/* Fixed controls — same position in every state, so the language
-              pickers and the primary button never jump. Pickers stay visible
-              (locked, not hidden) while translating. */}
-          <div className="flex flex-col gap-3">
-            <LanguageSelect
-              label={t('sourceLanguage')}
-              value={config.sourceLanguage}
-              uiLanguage={config.uiLanguage}
-              searchPlaceholder={t('searchLanguage')}
-              noResultsText={t('noResults')}
-              disabled={translation.isActive}
-              isOpen={openSelect === 'source'}
-              onOpenChange={(open) => setOpenSelect(open ? 'source' : null)}
-              onChange={(value) => updateField('sourceLanguage', value)}
-              placement="top"
-            />
-            <LanguageSelect
-              label={t('targetLanguage')}
-              value={config.targetLanguage}
-              uiLanguage={config.uiLanguage}
-              searchPlaceholder={t('searchLanguage')}
-              noResultsText={t('noResults')}
-              disabled={translation.isActive}
-              isOpen={openSelect === 'target'}
-              onOpenChange={(open) => setOpenSelect(open ? 'target' : null)}
-              onChange={(value) => updateField('targetLanguage', value)}
-              placement="top"
-            />
-          </div>
+              <div className="flex items-end gap-3">
+                <div className="min-w-0 flex-1">
+                  <VolumeSlider
+                    label={t('originalVolume')}
+                    value={config.originalVolume}
+                    onChange={(value) => updateField('originalVolume', value)}
+                    compact
+                  />
+                </div>
+                <PrimaryButton
+                  icon={<StopIcon />}
+                  onClick={toggle}
+                  variant="ghost"
+                  disabled={translation.isLoading}
+                  compact
+                  fullWidth={false}
+                >
+                  {t('stop')}
+                </PrimaryButton>
+              </div>
 
-          <PrimaryButton
-            icon={translation.isActive ? <StopIcon /> : <PlayIcon />}
-            onClick={toggle}
-            variant={translation.isActive ? 'ghost' : 'primary'}
-            disabled={translation.isLoading}
-          >
-            {translation.isLoading
-              ? t('connecting')
-              : translation.isActive
-                ? t('stop')
-                : t('startTranslation')}
-          </PrimaryButton>
+              {translation.transcripts.length === 0 && (
+                <p className="text-center text-caption leading-snug text-muted">
+                  {t('floatingWindowHint')}
+                </p>
+              )}
+            </>
+          )}
+        </main>
 
-          <VolumeSlider
-            label={t('voiceVolume')}
-            value={config.voiceVolume}
-            onChange={(value) => updateField('voiceVolume', value)}
-          />
-        </div>
-
-        <Footer label={t('tabAudioOnly')} />
+        {!translation.isActive && <Footer label={t('tabAudioOnly')} />}
       </div>
     </>
   )

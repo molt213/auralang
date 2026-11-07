@@ -1,5 +1,5 @@
 import { pipeline, env, type AutomaticSpeechRecognitionPipeline } from '@huggingface/transformers'
-import type { AsrTierId, DtypeRung, ModelStatus, ModelTier } from './types'
+import type { AsrTierId, DtypeRung, ModelStatus, TransformersTier } from './types'
 import { DEFAULT_TIER } from './registry'
 // Baked in at build time. The offscreen document exposes only a subset of
 // chrome.runtime (getURL and messaging work, getManifest does not), so the
@@ -36,7 +36,7 @@ export function onModelStatus(fn: StatusListener): void {
   listener = fn
 }
 
-function rungKey(tier: ModelTier, rung: DtypeRung): string {
+function rungKey(tier: TransformersTier, rung: DtypeRung): string {
   // Keyed by extension version so an update (which may bump transformers.js
   // and fix a previously broken export) retries rungs marked bad in the past.
   return `${tier.modelId}|${rung.device}|${rung.encoderDtype}|${rung.decoderDtype}|${EXTENSION_VERSION}`
@@ -123,7 +123,7 @@ function reportProgress(event: ProgressEvent): void {
 }
 
 async function loadRung(
-  tier: ModelTier,
+  tier: TransformersTier,
   rung: DtypeRung,
 ): Promise<AutomaticSpeechRecognitionPipeline> {
   return (await pipeline('automatic-speech-recognition', tier.modelId, {
@@ -136,7 +136,7 @@ async function loadRung(
   })) as AutomaticSpeechRecognitionPipeline
 }
 
-async function loadTier(tier: ModelTier): Promise<AutomaticSpeechRecognitionPipeline> {
+async function loadTier(tier: TransformersTier): Promise<AutomaticSpeechRecognitionPipeline> {
   resetProgress()
   const bad = getBadRungs()
 
@@ -166,7 +166,9 @@ async function loadTier(tier: ModelTier): Promise<AutomaticSpeechRecognitionPipe
 
 // Load (or switch to) a model tier. Idempotent: selecting the tier that's
 // already loaded or in flight is a no-op. Switching disposes the previous model.
-export function setModelTier(tier: ModelTier): void {
+// Only handles transformers.js tiers; the Dolphin tier runs in its own worker
+// (see asrClient routing).
+export function setModelTier(tier: TransformersTier): void {
   if (currentTierId === tier.id && (transcriber || loading)) return
 
   currentTierId = tier.id

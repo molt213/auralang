@@ -4,5 +4,20 @@
   },
   "extensionDescription": {
     "message": "Traduce el audio de cualquier pestaña en tiempo real. Transcripción local con Whisper, sin clave de API ni cuenta."
+  },
+  "floatingWindowToggle": {
+    "message": "Subtítulos flotantes"
+  },
+  "floatingPanelTitle": {
+    "message": "AuraLang"
+  },
+  "floatingPanelMinimize": {
+    "message": "Minimizar panel"
+  },
+  "floatingPanelExpand": {
+    "message": "Expandir panel"
+  },
+  "floatingPanelClose": {
+    "message": "Cerrar panel"
   }
 }

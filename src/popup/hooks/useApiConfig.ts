@@ -1,5 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import type { TranslationConfig, UserConfig } from '../../types'
+import type {
+  FinalTranslationProvider,
+  FinalTranslationConfig,
+  TranslationConfig,
+  TranslationProvider,
+  UserConfig,
+} from '../../types'
 import { detectBrowserLocale } from '../i18n'
 
 const STORAGE_KEY = 'auralang_config'
@@ -14,11 +20,18 @@ const DEFAULT_CONFIG: UserConfig = {
   uiLanguage: detectBrowserLocale(),
   uiTheme: detectPreferredTheme(),
   asrMode: 'auto',
-  voiceVolume: 1,
   // Low by default: original audio is a quiet background under the translation.
   originalVolume: 0.15,
   translation: {
     provider: 'google',
+    baseUrl: '',
+    model: '',
+    apiKey: '',
+    appId: '',
+  },
+  finalTranslation: {
+    enabled: false,
+    provider: 'openai-compatible',
     baseUrl: '',
     model: '',
     apiKey: '',
@@ -37,11 +50,43 @@ function storedVolume(value: unknown, fallback: number): number {
   return typeof value === 'number' && value >= 0 && value <= 1 ? value : fallback
 }
 
+function storedTranslationProvider(value: unknown): TranslationProvider {
+  if (
+    value === 'openai-compatible'
+    || value === 'index-translate'
+    || value === 'mymemory'
+    || value === 'baidu'
+  ) {
+    return value
+  }
+  return 'google'
+}
+
+function storedFinalTranslationProvider(value: unknown): FinalTranslationProvider {
+  return value === 'index-translate' ? 'index-translate' : 'openai-compatible'
+}
+
 function storedTranslationConfig(value: unknown, fallback: TranslationConfig): TranslationConfig {
   if (!isRecord(value)) return fallback
 
   return {
-    provider: value.provider === 'openai-compatible' ? 'openai-compatible' : 'google',
+    provider: storedTranslationProvider(value.provider),
+    baseUrl: storedString(value.baseUrl, fallback.baseUrl),
+    model: storedString(value.model, fallback.model),
+    apiKey: storedString(value.apiKey, fallback.apiKey),
+    appId: storedString(value.appId, fallback.appId),
+  }
+}
+
+function storedFinalTranslationConfig(
+  value: unknown,
+  fallback: FinalTranslationConfig,
+): FinalTranslationConfig {
+  if (!isRecord(value)) return fallback
+
+  return {
+    enabled: value.enabled === true,
+    provider: storedFinalTranslationProvider(value.provider),
     baseUrl: storedString(value.baseUrl, fallback.baseUrl),
     model: storedString(value.model, fallback.model),
     apiKey: storedString(value.apiKey, fallback.apiKey),
@@ -79,12 +124,12 @@ export function useApiConfig(): UseUserConfigReturn {
               ? stored.uiLanguage
               : prev.uiLanguage,
           uiTheme: stored.uiTheme === 'light' ? 'light' : stored.uiTheme === 'dark' ? 'dark' : prev.uiTheme,
-          asrMode: stored.asrMode === 'light' || stored.asrMode === 'balanced' || stored.asrMode === 'auto'
+          asrMode: stored.asrMode === 'light' || stored.asrMode === 'balanced' || stored.asrMode === 'auto' || stored.asrMode === 'dolphin'
             ? stored.asrMode
             : prev.asrMode,
-          voiceVolume: storedVolume(stored.voiceVolume, prev.voiceVolume),
           originalVolume: storedVolume(stored.originalVolume, prev.originalVolume),
           translation: storedTranslationConfig(stored.translation, prev.translation),
+          finalTranslation: storedFinalTranslationConfig(stored.finalTranslation, prev.finalTranslation),
         }))
       }
       setIsLoaded(true)

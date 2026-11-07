@@ -21,7 +21,7 @@ the project.
 ## 1. Project context
 
 AuraLang captures the active tab's audio, transcribes it locally with Whisper, translates the
-text, and reads the result aloud via the browser's built-in TTS. No API key required.
+text, and shows it as live captions. No API key required.
 
 The project uses:
 
@@ -61,18 +61,21 @@ Layout:
 
 ```txt
 src/
-├── background/          Service worker — tabCapture, offscreen lifecycle
-├── offscreen/           AudioContext + transcription/translation/TTS pipeline
-├── popup/               React UI — hooks, components, i18n
+├── asr/                 ASR engines: tiers/registry, model manager (Whisper), Dolphin client
+├── background/          Service worker — tabCapture, offscreen lifecycle, panel injection
+├── content/             Injected page overlay, floating panel, always-on-top captions
+├── offscreen/           AudioContext + transcription/translation pipeline
+├── popup/               React UI — hooks, components, i18n (floating panel iframe)
 ├── welcome/             First-install onboarding
-├── services/            transcriptionService, translationService, ttsService
+├── services/            transcriptionService, translationService
 ├── types/               Shared TypeScript interfaces
 ├── constants/           Language lists and shared constants
 └── utils/               Pure helpers
 ```
 
-Execution contexts (background, offscreen, popup) communicate via typed messages defined in
-`src/types/`. Services hold side effects; hooks orchestrate UI state; components render.
+Execution contexts (background, offscreen, popup iframe, content script) communicate via typed
+messages defined in `src/types/`. Services hold side effects; hooks orchestrate UI state;
+components render.
 
 ---
 
@@ -109,8 +112,8 @@ Use isolated services (`src/services/`, offscreen pipeline), never call external
 directly from UI components.
 
 - **Transcription:** `@huggingface/transformers` (Whisper) runs locally in the offscreen document.
-- **Translation:** unofficial Google Translate endpoint via `translationService`.
-- **TTS:** `speechSynthesis` via `ttsService`.
+- **Translation:** Google, MyMemory, Baidu, Bilibili Index-Translate, or an OpenAI-compatible API via `translationService`.
+- **TTS:** not shipped — the translation is shown as captions only.
 
 Handle errors gracefully; the UI must provide loading, error and idle states. Never expose API
 keys in the extension bundle.
@@ -175,7 +178,7 @@ this file they form the documentation package:
 - **AGENTS.md** (this file) — coding conventions, service rules, testing and accessibility contract.
 
 State clearly that MV3 + offscreen was chosen for audio capture, that TypeScript runs in strict
-mode, that services isolate transcription/translation/TTS, that settings persist in
+mode, that services isolate transcription and translation, that settings persist in
 `chrome.storage.local`, and that accessibility is a core requirement.
 
 ---

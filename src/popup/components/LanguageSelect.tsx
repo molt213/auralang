@@ -17,6 +17,8 @@ interface LanguageSelectProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   placement?: 'top' | 'bottom'
+  // Tighter spacing for the floating panel, where vertical room is scarce.
+  compact?: boolean
 }
 
 export function LanguageSelect({
@@ -30,6 +32,7 @@ export function LanguageSelect({
   isOpen,
   onOpenChange,
   placement = 'bottom',
+  compact = false,
 }: LanguageSelectProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -89,7 +92,7 @@ export function LanguageSelect({
       : 'top-[calc(100%+6px)] dropdown-panel-down'
 
   return (
-    <div ref={rootRef} className="flex flex-col gap-1.5">
+    <div ref={rootRef} className={`flex flex-col ${compact ? 'gap-1' : 'gap-1.5'}`}>
       <span className="text-caption font-medium text-muted">{label}</span>
 
       <div className="relative">
@@ -105,7 +108,9 @@ export function LanguageSelect({
             }
             onOpenChange(true)
           }}
-          className={`flex w-full items-center justify-between gap-3 rounded-xl border bg-[var(--surface-elevated)] px-3.5 py-3 text-left text-body text-[var(--text-primary)] shadow-[var(--surface-shadow)] transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
+          className={`flex w-full items-center justify-between gap-3 rounded-xl border bg-[var(--surface-elevated)] text-left text-[var(--text-primary)] shadow-[var(--surface-shadow)] transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
+            compact ? 'px-3 py-2 text-caption' : 'px-3.5 py-3 text-body'
+          } ${
             isOpen
               ? 'border-brand-purple ring-2 ring-brand-purple/20'
               : 'border-[var(--border-color)] hover:border-brand-purple/40'
@@ -138,7 +143,7 @@ export function LanguageSelect({
               </div>
             </div>
 
-            <ul role="listbox" className="dropdown-list max-h-36 overflow-y-auto p-1.5">
+            <ul role="listbox" className={`dropdown-list overflow-y-auto p-1.5 ${compact ? 'max-h-32' : 'max-h-36'}`}>
               {filtered.length === 0 ? (
                 <li className="px-3 py-4 text-center text-caption text-muted">{noResultsText}</li>
               ) : (
@@ -149,7 +154,9 @@ export function LanguageSelect({
                       <button
                         type="button"
                         onClick={() => handleSelect(option.code)}
-                        className={`w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-body transition-colors ${
+                        className={`w-full flex items-center justify-between gap-2 rounded-lg px-3 transition-colors ${
+                          compact ? 'py-1.5 text-caption' : 'py-2 text-body'
+                        } ${
                           isSelected
                             ? 'bg-brand-purple/15 text-brand-purple font-medium'
                             : 'text-[var(--text-primary)] hover:bg-brand-purple/10'

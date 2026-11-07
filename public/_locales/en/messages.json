@@ -4,5 +4,20 @@
   },
   "extensionDescription": {
     "message": "Translate audio from any tab in real time. Local Whisper transcription, no API key or account required."
+  },
+  "floatingWindowToggle": {
+    "message": "Floating captions"
+  },
+  "floatingPanelTitle": {
+    "message": "AuraLang"
+  },
+  "floatingPanelMinimize": {
+    "message": "Minimize panel"
+  },
+  "floatingPanelExpand": {
+    "message": "Expand panel"
+  },
+  "floatingPanelClose": {
+    "message": "Close panel"
   }
 }

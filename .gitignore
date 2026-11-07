@@ -42,8 +42,16 @@ Thumbs.db
 # Vite
 .vite/
 
+# Generated sherpa-onnx wasm runtime (staged by scripts/prepare-sherpa-wasm.mjs)
+public/wasm/
+
 # Local tooling
 .atl/
+.mimosa/
+.zcode/
 
 # Build artifacts
 *.zip
+
+# Local model files for the Dolphin smoke test
+tmp/

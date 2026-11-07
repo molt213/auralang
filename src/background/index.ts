@@ -2,6 +2,7 @@ import type { AsrMode } from '../asr/types'
 import type {
   CaptureStateResponse,
   ExtensionMessage,
+  FinalTranslationConfig,
   StartCapturePayload,
   TranslationConfig,
 } from '../types'
@@ -10,6 +11,7 @@ import {
   loadCaptureSession,
   saveCaptureSession,
 } from './captureSessionService'
+import { installFloatingPanel } from '../content/floatingPanel'
 import {
   disposeVideoSubtitleOverlay,
   ensureVideoSubtitleOverlay,
@@ -22,19 +24,14 @@ let captureActive = false
 let capturedTabId: number | null = null
 let latestTranscriptSegmentId = 0
 
-const PANEL_PATH = 'src/popup/index.html'
-
-// Per-tab side panel, opened explicitly on icon click. A globally-registered
-// panel (manifest side_panel.default_path + openPanelOnActionClick) stays
-// visible on every tab and window — and lets the user hit Start on tabs where
-// the icon was never clicked, where activeTab was never granted, so capture
-// fails with "Extension has not been invoked for the current page". Opening
-// per-tab means the icon click both grants activeTab for that exact tab and
-// scopes the panel to it: it only shows while that tab is active.
+// The panel floats inside the page instead of taking over a side panel, so the
+// video keeps its full width. The icon click both grants activeTab for this
+// exact tab (needed for tabCapture) and toggles the panel on it.
 chrome.action.onClicked.addListener((tab) => {
   if (tab.id === undefined) return
-  void chrome.sidePanel.setOptions({ tabId: tab.id, path: PANEL_PATH, enabled: true })
-  void chrome.sidePanel.open({ tabId: tab.id })
+  void chrome.scripting
+    .executeScript({ target: { tabId: tab.id }, func: installFloatingPanel })
+    .catch(() => undefined)
 })
 
 // Create offscreen document immediately so Whisper model starts loading
@@ -46,23 +43,66 @@ chrome.runtime.onInstalled.addListener((details) => {
 })
 chrome.runtime.onStartup.addListener(() => void ensureOffscreenDocument())
 
+function updateActionBadge(tabId: number, active: boolean): void {
+  try {
+    void chrome.action.setBadgeText({ tabId, text: active ? 'REC' : '' }).catch(() => undefined)
+    if (active) {
+      void chrome.action.setBadgeBackgroundColor({ tabId, color: '#6C4DFF' }).catch(() => undefined)
+    }
+  } catch {
+    // The badge is a convenience; a browser that lacks it must not break capture.
+  }
+}
+
 async function setCaptureActive(active: boolean): Promise<void> {
+  const tabId = capturedTabId
   captureActive = active
   latestTranscriptSegmentId = 0
-  if (active && capturedTabId !== null) {
-    await saveCaptureSession(capturedTabId, latestTranscriptSegmentId)
+  if (active && tabId !== null) {
+    updateActionBadge(tabId, true)
+    await saveCaptureSession(tabId, latestTranscriptSegmentId)
     return
   }
+  // Closing the panel does not stop capture, so the toolbar badge is what
+  // tells the user a tab is still being captured.
+  if (tabId !== null) updateActionBadge(tabId, false)
   await clearCaptureSession()
 }
 
+function requestStreamState(): Promise<boolean> {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(
+      { type: 'GET_STREAM_STATE' } satisfies ExtensionMessage,
+      (response: { capturing?: boolean } | undefined) => {
+        if (chrome.runtime.lastError) {
+          resolve(false)
+          return
+        }
+        resolve(response?.capturing === true)
+      },
+    )
+  })
+}
+
 async function getCaptureActive(): Promise<boolean> {
-  if (captureActive) return true
-  const session = await loadCaptureSession()
-  captureActive = session.active
-  capturedTabId = session.tabId
-  latestTranscriptSegmentId = session.latestSegmentId
-  return captureActive
+  if (!captureActive) {
+    const session = await loadCaptureSession()
+    captureActive = session.active
+    capturedTabId = session.tabId
+    latestTranscriptSegmentId = session.latestSegmentId
+  }
+  if (!captureActive) return false
+
+  // The persisted flag can outlive the offscreen stream (extension reload, a
+  // crashed document). Never let the panel sit on "waiting for speech" for a
+  // capture that is not actually running.
+  if (await requestStreamState()) return true
+
+  captureActive = false
+  capturedTabId = null
+  latestTranscriptSegmentId = 0
+  await clearCaptureSession()
+  return false
 }
 
 async function getCapturedTabId(): Promise<number | null> {
@@ -93,6 +133,12 @@ async function startCapture(payload: StartCapturePayload): Promise<void> {
     type: 'BEGIN_STREAM',
     payload,
   })
+  // BEGIN_STREAM only resolves after the offscreen document has set up its
+  // audio graph, but a silent failure (or an old document that ignored the
+  // message) must not leave the panel pretending to listen.
+  if (!(await requestStreamState())) {
+    throw new Error('captureNotStarted')
+  }
   await setCaptureActive(true)
 }
 
@@ -107,8 +153,8 @@ async function stopCapture(): Promise<void> {
     // Keep offscreen alive so the model stays in memory
     await chrome.runtime.sendMessage<ExtensionMessage>({ type: 'END_STREAM' })
   }
-  capturedTabId = null
   await setCaptureActive(false)
+  capturedTabId = null
 }
 
 // Backup for the offscreen "stream ended" signal: if the captured tab is closed
@@ -138,20 +184,38 @@ async function beginCaptureForTab(
   asrMode: AsrMode,
   originalVolume: number,
   translation: TranslationConfig,
+  finalTranslation: FinalTranslationConfig,
   isRetry = false,
 ): Promise<void> {
   try {
     const streamId = await requestMediaStreamId(tabId)
     capturedTabId = tabId
     await ensureVideoSubtitleOverlay(tabId)
-    await startCapture({ streamId, targetLanguage, sourceLanguage, asrMode, originalVolume, translation })
+    await startCapture({
+      streamId,
+      targetLanguage,
+      sourceLanguage,
+      asrMode,
+      originalVolume,
+      translation,
+      finalTranslation,
+    })
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'unknownError'
     // Stale session from a tab that closed without a clean STOP_CAPTURE — clear
     // our own state and retry once before giving up.
     if (!isRetry && msg.includes('active stream')) {
       await stopCapture()
-      await beginCaptureForTab(tabId, targetLanguage, sourceLanguage, asrMode, originalVolume, translation, true)
+      await beginCaptureForTab(
+        tabId,
+        targetLanguage,
+        sourceLanguage,
+        asrMode,
+        originalVolume,
+        translation,
+        finalTranslation,
+        true,
+      )
       return
     }
     throw err
@@ -161,7 +225,14 @@ async function beginCaptureForTab(
 chrome.runtime.onMessage.addListener(
   (message: ExtensionMessage, _sender, sendResponse) => {
     if (message.type === 'START_CAPTURE') {
-      const { targetLanguage, sourceLanguage, asrMode, originalVolume, translation } = message.payload
+      const {
+        targetLanguage,
+        sourceLanguage,
+        asrMode,
+        originalVolume,
+        translation,
+        finalTranslation,
+      } = message.payload
 
       // targetTabId = tab to capture; omit consumerTabId so offscreen can redeem the streamId (Chrome 116+)
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -170,7 +241,15 @@ chrome.runtime.onMessage.addListener(
           sendResponse({ success: false, error: 'No active tab found' })
           return
         }
-        beginCaptureForTab(tabId, targetLanguage, sourceLanguage, asrMode, originalVolume, translation)
+        beginCaptureForTab(
+          tabId,
+          targetLanguage,
+          sourceLanguage,
+          asrMode,
+          originalVolume,
+          translation,
+          finalTranslation,
+        )
           .then(() => sendResponse({ success: true }))
           .catch((err: unknown) => {
             const msg = err instanceof Error ? err.message : 'unknownError'

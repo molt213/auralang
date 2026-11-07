@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals'
 
+import { installFloatingPanel } from '../content/floatingPanel'
 import type { ExtensionMessage, TranscriptUpdatePayload } from '../types'
 import {
   CAPTURED_TAB_ID_KEY,
@@ -16,15 +17,25 @@ type SessionGet = (keys: string[]) => Promise<Record<string, unknown>>
 type TabSendMessage = (tabId: number, message: unknown) => Promise<unknown>
 
 let messageListener: MessageListener | null = null
+let actionClickListener: ((tab: chrome.tabs.Tab) => void) | null = null
 
 const sessionGet = jest.fn<SessionGet>()
+const sessionRemove = jest.fn<(keys: string[]) => Promise<unknown>>()
 const tabSendMessage = jest.fn<TabSendMessage>()
+const executeScript = jest.fn<(details: unknown) => Promise<unknown>>()
+let streamCapturing = true
 
 function mockBackgroundChrome(): void {
   Object.defineProperty(globalThis, 'chrome', {
     configurable: true,
     value: {
-      action: { onClicked: { addListener: () => undefined } },
+      action: {
+        onClicked: {
+          addListener: (listener: (tab: chrome.tabs.Tab) => void) => { actionClickListener = listener },
+        },
+        setBadgeBackgroundColor: () => Promise.resolve(),
+        setBadgeText: () => Promise.resolve(),
+      },
       offscreen: { createDocument: () => Promise.resolve() },
       runtime: {
         getURL: (path: string) => `chrome-extension://auralang/${path}`,
@@ -32,16 +43,22 @@ function mockBackgroundChrome(): void {
         onInstalled: { addListener: () => undefined },
         onMessage: { addListener: (listener: MessageListener) => { messageListener = listener } },
         onStartup: { addListener: () => undefined },
-        sendMessage: () => Promise.resolve({ success: true }),
+        sendMessage: (message: { type?: string }, callback?: (response: unknown) => void) => {
+          const response = message?.type === 'GET_STREAM_STATE'
+            ? { capturing: streamCapturing }
+            : { success: true }
+          if (typeof callback === 'function') {
+            callback(response)
+            return undefined
+          }
+          return Promise.resolve(response)
+        },
       },
-      sidePanel: {
-        open: () => Promise.resolve(),
-        setOptions: () => Promise.resolve(),
-      },
+      scripting: { executeScript },
       storage: {
         session: {
           get: sessionGet,
-          remove: () => Promise.resolve(),
+          remove: sessionRemove,
           set: () => Promise.resolve(),
         },
       },
@@ -55,10 +72,19 @@ function mockBackgroundChrome(): void {
   })
 }
 
+beforeAll(async () => {
+  mockBackgroundChrome()
+  await import('./index')
+})
+
 beforeEach(() => {
-  messageListener = null
   sessionGet.mockReset()
+  sessionRemove.mockReset()
+  sessionRemove.mockResolvedValue(undefined)
+  streamCapturing = true
   tabSendMessage.mockReset()
+  executeScript.mockReset()
+  executeScript.mockResolvedValue([])
   sessionGet.mockResolvedValue({
     [CAPTURE_STATE_KEY]: true,
     [CAPTURED_TAB_ID_KEY]: 42,
@@ -73,7 +99,6 @@ afterEach(() => {
 
 describe('Given a restarted service worker with an active capture session', () => {
   it('When a transcript update arrives, Then it forwards the subtitle to the restored tab', async () => {
-    await import('./index')
     if (!messageListener) throw new Error('The background message listener was not registered')
 
     const transcript: TranscriptUpdatePayload = {
@@ -108,5 +133,37 @@ describe('Given a restarted service worker with an active capture session', () =
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
 
     expect(captureState).toEqual({ active: true, latestSegmentId: 1 })
+  })
+
+  it('When the offscreen document is no longer capturing, Then the stale session is cleared', async () => {
+    if (!messageListener) throw new Error('The background message listener was not registered')
+    streamCapturing = false
+
+    let captureState: unknown
+    messageListener(
+      { type: 'GET_CAPTURE_STATE' },
+      {} as chrome.runtime.MessageSender,
+      (response) => { captureState = response },
+    )
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+    expect(captureState).toEqual({ active: false, latestSegmentId: 0 })
+    expect(sessionRemove).toHaveBeenCalledWith([
+      CAPTURE_STATE_KEY,
+      CAPTURED_TAB_ID_KEY,
+      LATEST_SEGMENT_ID_KEY,
+    ])
+  })
+
+  it('When the toolbar icon is clicked, Then the floating panel is injected into that tab', async () => {
+    if (!actionClickListener) throw new Error('The background action listener was not registered')
+
+    actionClickListener({ id: 42 } as chrome.tabs.Tab)
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+    expect(executeScript).toHaveBeenCalledWith({
+      target: { tabId: 42 },
+      func: installFloatingPanel,
+    })
   })
 })

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import toast from 'react-hot-toast'
+import { DOLPHIN_DOWNLOAD_FAILED_PREFIX, DOLPHIN_MODEL_FAILED_PREFIX } from '../../asr/dolphin/types'
 import type { MessageKey } from './useI18n'
 
 interface UseErrorToastsOptions {
@@ -21,12 +22,55 @@ function friendlyMessage(error: string, t: (key: MessageKey) => string): string 
     externalApiMissingTranslation: 'externalApi.errorMissingTranslation',
     externalApiPermissionDenied: 'externalApi.errorPermissionDenied',
     externalApiSetupFailed: 'externalApi.errorSetupFailed',
+    captureNotStarted: 'captureNotStarted',
+  }
+  if (error.startsWith('indexTranslateRequestFailed:')) {
+    return `${t('indexTranslate.errorRequestFailed')} (${error.slice('indexTranslateRequestFailed:'.length)})`
+  }
+  if (error === 'indexTranslateNetworkFailed') {
+    return t('indexTranslate.errorNetworkFailed')
   }
   if (error.startsWith('externalApiRequestFailed:')) {
     return t('externalApi.errorRequestFailed')
   }
   if (error.startsWith('googleTranslationRequestFailed:')) {
     return t('google.errorRequestFailed')
+  }
+  if (error.startsWith('mymemoryRequestFailed:')) {
+    return t('mymemory.errorRequestFailed')
+  }
+  if (error === 'mymemoryQuotaExceeded') {
+    return t('mymemory.errorQuotaExceeded')
+  }
+  if (error.startsWith('baiduRequestFailed:')) {
+    // The numeric code makes a failed request actionable: 52003 = unauthorized,
+    // 54001 = bad signature, 54003 = rate limit, 54004 = no balance,
+    // 58001 = unsupported language pair.
+    return `${t('baidu.errorRequestFailed')} (${error.slice('baiduRequestFailed:'.length)})`
+  }
+  if (error === 'baiduNetworkFailed') {
+    return t('baidu.errorNetworkFailed')
+  }
+  if (error === 'baiduInvalidResponse') {
+    return t('baidu.errorInvalidResponse')
+  }
+  if (error === 'baiduMissingAppId') {
+    return t('baidu.errorMissingAppId')
+  }
+  if (error === 'baiduMissingKey') {
+    return t('baidu.errorMissingKey')
+  }
+  if (error === 'translationPermissionDenied') {
+    return t('translationPermissionDenied')
+  }
+  if (error.startsWith(DOLPHIN_DOWNLOAD_FAILED_PREFIX)) {
+    return t('dolphin.errorDownloadFailed')
+  }
+  if (error.startsWith(DOLPHIN_MODEL_FAILED_PREFIX)) {
+    return t('dolphin.errorLoadFailed')
+  }
+  if (error.startsWith('Dolphin')) {
+    return t('dolphin.errorTranscribeFailed')
   }
   const translatedError = translatedErrors[error]
   if (translatedError) return t(translatedError)

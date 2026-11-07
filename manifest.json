@@ -11,16 +11,29 @@
     "unlimitedStorage",
     "activeTab",
     "scripting",
-    "sidePanel"
+    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess"
   ],
   "host_permissions": [
-    "https://translate.googleapis.com/*"
+    "https://translate.googleapis.com/*",
+    "https://api.mymemory.translated.net/*",
+    "https://fanyi-api.baidu.com/*",
+    "https://index-translate.bilibili.com/*"
   ],
   "optional_host_permissions": [
     "https://*/*",
     "http://localhost/*",
     "http://127.0.0.1/*"
   ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "index_translate_origin",
+        "enabled": true,
+        "path": "rules/index-translate-origin.json"
+      }
+    ]
+  },
   "background": {
     "service_worker": "src/background/index.ts",
     "type": "module"
@@ -37,6 +50,12 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
+  "web_accessible_resources": [
+    {
+      "resources": ["src/popup/index.html", "assets/*"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
   }

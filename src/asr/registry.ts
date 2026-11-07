@@ -1,4 +1,4 @@
-import type { AsrMode, ModelTier } from './types'
+import type { AsrMode, DolphinTier, ModelTier, TransformersTier } from './types'
 
 // Single source of truth for available ASR models. All models multilingual —
 // `.en` variants are banned (see docs/ASR_ARCHITECTURE.md).
@@ -10,8 +10,9 @@ import type { AsrMode, ModelTier } from './types'
 // model, so the light tier is fp32-only. Do NOT add a quantized rung here
 // without first verifying that specific export actually creates a session —
 // a rung that always throws is worse than not offering it.
-export const LIGHT_TIER: ModelTier = {
+export const LIGHT_TIER: TransformersTier = {
   id: 'light',
+  engine: 'transformers',
   modelId: 'onnx-community/whisper-tiny',
   approxDownloadMB: 150,
   ladder: [{ encoderDtype: 'fp32', decoderDtype: 'fp32', device: 'wasm' }],
@@ -21,11 +22,25 @@ export const LIGHT_TIER: ModelTier = {
 // terms), at the cost of a larger download and higher latency. fp32-only for the
 // same reason as the light tier — this model's quantized decoder exports are not
 // verified to load, and shipping an unverified rung caused stuck loads before.
-export const BALANCED_TIER: ModelTier = {
+export const BALANCED_TIER: TransformersTier = {
   id: 'balanced',
+  engine: 'transformers',
   modelId: 'onnx-community/whisper-base',
   approxDownloadMB: 290,
   ladder: [{ encoderDtype: 'fp32', decoderDtype: 'fp32', device: 'wasm' }],
+}
+
+// Japanese-focused tier: DataoceanAI's Dolphin CTC-Attention model (sherpa-onnx
+// int8 export, ~238 MiB). Trained on 35k hours of Japanese (ReazonSpeech) among
+// 212k hours total for 40 Asian languages; published Japanese numbers are far
+// better than whisper-base (FLEURS WER 5.5 vs 25.0 in the Dolphin paper). Runs
+// on the sherpa-onnx wasm runtime in its own classic worker
+// (public/workers/sherpa-dolphin.worker.js), not on transformers.js.
+export const DOLPHIN_TIER: DolphinTier = {
+  id: 'dolphin',
+  engine: 'sherpa-dolphin',
+  modelId: 'csukuangfj/sherpa-onnx-dolphin-small-ctc-multi-lang-int8-2025-04-02',
+  approxDownloadMB: 250,
 }
 
 export const DEFAULT_TIER = LIGHT_TIER
@@ -43,5 +58,6 @@ function prefersBalancedTier(): boolean {
 export function tierForMode(mode: AsrMode): ModelTier {
   if (mode === 'balanced') return BALANCED_TIER
   if (mode === 'light') return LIGHT_TIER
+  if (mode === 'dolphin') return DOLPHIN_TIER
   return prefersBalancedTier() ? BALANCED_TIER : LIGHT_TIER
 }

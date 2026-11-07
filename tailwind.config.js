@@ -12,6 +12,10 @@ export default {
         h2: ['20px', { lineHeight: '1.3', fontWeight: '600' }],
         body: ['14px', { lineHeight: '1.5', fontWeight: '400' }],
         caption: ['12px', { lineHeight: '1.4', fontWeight: '400' }],
+        // Captions scale a little with the panel width, but original and
+        // translation share one size at the user's request; the translation is
+        // distinguished by colour and weight, not size.
+        subtitle: ['clamp(14px, 3.9vw, 17px)', { lineHeight: '1.5', fontWeight: '400' }],
       },
       colors: {
         brand: {
